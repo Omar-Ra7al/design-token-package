@@ -11,6 +11,7 @@ export type DesignTokensConfig = {
   };
   output: {
     css: string;
+    tailwindTheme?: boolean;
   };
   inject?: {
     css: string;
@@ -59,7 +60,7 @@ function normalizeConfig(raw: unknown): DesignTokensConfig {
 
   const config = raw as Partial<DesignTokensConfig>;
   if (!config.tokens?.file || !config.tokens?.export) {
-    throw new Error('design-tokens config requires tokens.file and tokens.export');
+    throw new Error("design-tokens config requires tokens.file and tokens.export");
   }
   if (!config.output?.css) {
     throw new Error("design-tokens config requires output.css");
@@ -72,6 +73,7 @@ function normalizeConfig(raw: unknown): DesignTokensConfig {
     },
     output: {
       css: config.output.css,
+      ...(config.output.tailwindTheme ? { tailwindTheme: true } : {}),
     },
     ...(config.inject?.css ? { inject: { css: config.inject.css } } : {}),
   };
@@ -111,11 +113,12 @@ export function configsEqual(
     a.tokens.file === b.tokens.file &&
     a.tokens.export === b.tokens.export &&
     a.output.css === b.output.css &&
+    Boolean(a.output.tailwindTheme) === Boolean(b.output.tailwindTheme) &&
     (a.inject?.css ?? null) === (b.inject?.css ?? null)
   );
 }
 
-/** True when resolved settings match pure conventions (no inject stored). */
+/** True when settings match conventions and Tailwind theme flag is off. */
 export function isConventionConfig(
   root: string,
   config: DesignTokensConfig,
@@ -124,11 +127,24 @@ export function isConventionConfig(
   return (
     config.tokens.file === defaults.tokens.file &&
     config.tokens.export === defaults.tokens.export &&
-    config.output.css === defaults.output.css
+    config.output.css === defaults.output.css &&
+    !config.output.tailwindTheme
   );
 }
 
+export function needsConfigFile(
+  root: string,
+  config: DesignTokensConfig,
+): boolean {
+  return !isConventionConfig(root, config);
+}
+
 export function formatConfigFile(config: DesignTokensConfig): string {
+  const outputLines = [`    css: ${JSON.stringify(config.output.css)},`];
+  if (config.output.tailwindTheme) {
+    outputLines.push(`    tailwindTheme: true,`);
+  }
+
   const injectBlock = config.inject?.css
     ? `
   inject: {
@@ -142,7 +158,7 @@ export function formatConfigFile(config: DesignTokensConfig): string {
     export: ${JSON.stringify(config.tokens.export)},
   },
   output: {
-    css: ${JSON.stringify(config.output.css)},
+${outputLines.join("\n")}
   },${injectBlock}
 };
 `;

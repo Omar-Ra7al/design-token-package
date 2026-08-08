@@ -1,11 +1,16 @@
 import { createJiti } from "jiti";
 
 import { loadConfig, type ResolvedConfig } from "./config";
-import { writeCssFile } from "./css-output";
+import { PACKAGE_BANNER_NAME, writeCssFile } from "./css-output";
 import { resolveFromRoot } from "./paths";
+import {
+  collectTokenKeys,
+  formatTailwindThemeBlock,
+} from "./tailwind-theme";
 
 export type TokensLike = {
   css: () => string;
+  themes?: Record<string, { tokens?: Record<string, string> }>;
 };
 
 export async function loadTokensExport(
@@ -23,9 +28,7 @@ export async function loadTokensExport(
   const exported = record[exportName];
 
   if (!exported || typeof exported !== "object") {
-    throw new Error(
-      `Export "${exportName}" not found in ${tokensFile}`,
-    );
+    throw new Error(`Export "${exportName}" not found in ${tokensFile}`);
   }
 
   const api = exported as Partial<TokensLike>;
@@ -47,7 +50,17 @@ export async function runBuild(
   const outputPath = resolveFromRoot(resolved.root, resolved.output.css);
 
   const tokens = await loadTokensExport(tokensFile, resolved.tokens.export);
-  writeCssFile(outputPath, tokens.css());
+  let themeBlock: string | undefined;
+
+  if (resolved.output.tailwindTheme) {
+    const keys = collectTokenKeys(tokens.themes ?? {});
+    themeBlock = formatTailwindThemeBlock(keys);
+  }
+
+  writeCssFile(outputPath, tokens.css(), {
+    packageName: PACKAGE_BANNER_NAME,
+    themeBlock,
+  });
 
   return { outputPath };
 }
