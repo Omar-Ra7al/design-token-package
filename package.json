@@ -1,6 +1,6 @@
 {
   "name": "design-token-package",
-  "version": "0.0.2",
+  "version": "0.0.1",
   "description": "Theme token system package",
   "license": "MIT",
   "type": "module",
@@ -18,6 +18,9 @@
       "import": "./dist/react/index.js"
     },
     "./package.json": "./package.json"
+  },
+  "bin": {
+    "design-tokens": "./dist/cli/index.js"
   },
   "files": [
     "dist"
@@ -77,5 +80,10 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.7.0",
+    "cac": "^7.0.0",
+    "jiti": "^2.7.0"
   }
 }
