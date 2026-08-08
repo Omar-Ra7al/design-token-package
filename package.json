@@ -1,7 +1,7 @@
 {
-  "name": "@your-scope/package-template",
+  "name": "@Omar-Ra7al/design-token-package",
   "version": "0.0.0",
-  "description": "A lightweight TypeScript/React npm package starter with a live playground",
+  "description": "Theme token system package",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

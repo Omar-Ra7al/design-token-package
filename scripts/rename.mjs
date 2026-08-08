@@ -24,7 +24,7 @@ if (!name.startsWith('@') || !name.includes('/')) {
 }
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const previousName = '@your-scope/package-template';
+const previousName = '@Omar-Ra7al/design-token-package';
 
 const packageJsonPath = resolve(root, 'package.json');
 const readmePath = resolve(root, 'README.md');
@@ -45,6 +45,7 @@ const replaceName = (filePath) => {
 replaceName(readmePath);
 replaceName(playgroundConfigPath);
 replaceName(playgroundAppPath);
+replaceName(resolve(root, 'playground/src/demoTokens.ts'));
 replaceName(tsconfigPath);
 
 console.log(`Updated package name to ${name}`);

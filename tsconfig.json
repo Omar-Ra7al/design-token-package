@@ -17,8 +17,8 @@
     "esModuleInterop": true,
     "noEmit": true,
     "paths": {
-      "@your-scope/package-template": ["./src"],
-      "@your-scope/package-template/*": ["./src/*"]
+      "@Omar-Ra7al/design-token-package": ["./src/index.ts"],
+      "@Omar-Ra7al/design-token-package/*": ["./src/*"]
     }
   },
   "include": [

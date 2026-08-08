@@ -1,65 +1,136 @@
-# @your-scope/package-template
+# Design token toolkit
 
-Lightweight starter for TypeScript/React npm packages, with a live playground for developing in the browser.
+Typed TypeScript design tokens that compile to CSS custom properties per theme. You define the values; this package provides the factory, React injector, and typed helpers.
+
+```
+defineTokens({ themes, defaultTheme })
+    → TokensApi { get, var, css, themes, themeNames, defaultTheme }
+    → <TokenSheet tokens={…} /> injects CSS into <style>
+    → class-based theme switching (.dark, .ocean, …) on <html>
+```
+
+## Install
+
+```bash
+npm install @Omar-Ra7al/design-token-package
+```
+
+Peer dependencies: `react` and `react-dom` (`^18` or `^19`).
 
 ## Quick start
 
+```ts
+import { defineTokens, TokenSheet } from "@Omar-Ra7al/design-token-package";
+import type { TokensApi, TokenRef } from "@Omar-Ra7al/design-token-package";
+
+export const tokens = defineTokens({
+  defaultTheme: "light",
+  themes: {
+    light: {
+      selector: ":root",
+      tokens: {
+        background: "oklch(1 0 0)",
+        foreground: "oklch(0.145 0 0)",
+        primary: "oklch(0% 0 0)",
+        radius: "0.625rem",
+      },
+    },
+    dark: {
+      selector: ".dark",
+      tokens: {
+        background: "oklch(0% 0 0)",
+        foreground: "oklch(1 0 0)",
+        primary: "oklch(1 0 0)",
+        radius: "0.625rem",
+      },
+    },
+  },
+});
+
+// In your root layout:
+// <TokenSheet tokens={tokens} />
+```
+
+Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exist before paint. Toggle themes by adding/removing class names on `<html>` (e.g. with `next-themes`); that is **not** bundled here.
+
+## Public API
+
+| Export | Role |
+|--------|------|
+| `defineTokens` | Factory → `TokensApi` |
+| `TokenSheet` | React component that injects `tokens.css()` |
+| Types | `DefineTokensConfig`, `ThemeDefinition`, `TokenMap`, `TokensApi`, `TokenRef`, `OpacityScale` |
+
+### `TokensApi`
+
+| Member | Purpose |
+|--------|---------|
+| `themes` | Raw theme definitions |
+| `defaultTheme` | Default theme name |
+| `themeNames` | Theme name list (handy for theme switchers) |
+| `get(theme, ref)` | Resolved literal for a named theme |
+| `var(ref)` | `var(--key)` or opacity `color-mix(...)` — tracks the active theme |
+| `css()` | Full stylesheet string (`:root{…}.dark{…}`) |
+
+### Opacity refs
+
+```ts
+tokens.get("light", "primary/20");
+// color-mix(in oklch, … 20%, transparent)
+
+tokens.var("primary/50");
+// color-mix(in oklch, var(--primary) 50%, transparent)
+```
+
+Types autocomplete the usual 0–100 steps of 5. Runtime accepts any integer 0–100.
+
+## Consuming in CSS / Tailwind
+
+This package only emits CSS variables. Bridging to Tailwind v4 utilities (or any other CSS framework) stays in your app:
+
+```css
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --radius-lg: var(--radius);
+}
+```
+
+Or use raw vars:
+
+```tsx
+style={{ background: tokens.var("background") }}
+className="bg-[var(--background)]"
+```
+
+## Local development
+
 ```bash
 npm install
-npm run dev
+npm run dev        # playground (demo tokens live in playground/src/)
+npm run test
+npm run build
+npm run pack:check
 ```
 
-That opens a minimal React app in `playground/` that imports your package **source** from `src/`. Edit a component, hook, or util — save — and see it update immediately.
-
-## Project structure
-
-```text
-src/                 # package implementation (published API via index.ts)
-  components/
-  hooks/
-  utils/
-  types/
-  index.ts
-playground/          # local React app for manual testing (not published)
-tests/               # Vitest + React Testing Library
-scripts/             # helpers (e.g. rename)
-vite.config.ts       # library build
-vitest.config.ts
-```
-
-Only symbols re-exported from `src/index.ts` are part of the public API.
-
-## Create a new package from this starter
-
-```bash
-node scripts/rename.mjs @your-scope/my-package "What this package does"
-```
-
-Then replace the sample code in `src/`, keep exporting from `src/index.ts`, and use the playground while you build.
+Only symbols re-exported from `src/index.ts` are published. The concrete light/dark/ocean palette in `playground/` is a consumer demo and is **not** part of the package.
 
 ## Scripts
 
-| Script                            | Purpose                               |
-| --------------------------------- | ------------------------------------- |
-| `npm run dev`                     | Start the playground                  |
-| `npm run build`                   | Build the library into `dist/`        |
-| `npm run test` / `test:watch`     | Run tests                             |
-| `npm run typecheck`               | TypeScript check                      |
-| `npm run lint` / `lint:fix`       | ESLint                                |
-| `npm run format` / `format:check` | Prettier                              |
-| `npm run pack:check`              | Preview files that would be published |
-| `npm run changeset`               | Record a version change               |
-| `npm run version`                 | Apply Changesets version bumps        |
-| `npm run release`                 | Build and publish with Changesets     |
+| Script | Purpose |
+|--------|---------|
+| `npm run dev` | Start the playground |
+| `npm run build` | Build the library into `dist/` |
+| `npm run test` / `test:watch` | Run tests |
+| `npm run typecheck` | TypeScript check |
+| `npm run lint` / `lint:fix` | ESLint |
+| `npm run format` / `format:check` | Prettier |
+| `npm run pack:check` | Preview files that would be published |
+| `npm run changeset` / `version` / `release` | Changesets publish flow |
 
-## Build and publish
+## Rename this package
 
 ```bash
-npm run build
-npm run pack:check
-npm run changeset
-npm run version
-npm run release
+node scripts/rename.mjs @your-scope/design-tokens "Typed design token toolkit"
 ```
-
-The published package includes `dist/`, `package.json`, `README.md`, and `LICENSE` only — not `playground/`, tests, or tooling config.
