@@ -1,0 +1,7 @@
+dist
+playground/dist
+coverage
+node_modules
+*.tgz
+package-lock.json
+CHANGELOG.md
