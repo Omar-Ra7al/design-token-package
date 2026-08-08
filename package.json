@@ -1,5 +1,5 @@
 {
-  "name": "@Omar-Ra7al/design-token-package",
+  "name": "design-token-package",
   "version": "0.0.1",
   "description": "Theme token system package",
   "license": "MIT",
@@ -12,6 +12,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -37,6 +41,14 @@
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",

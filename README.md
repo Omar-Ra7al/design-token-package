@@ -1,84 +1,103 @@
 # Design token toolkit
 
-Typed TypeScript design tokens that compile to CSS custom properties per theme. You define the values; this package provides the factory, React injector, and typed helpers.
+Typed TypeScript design tokens that compile to CSS custom properties per theme. The **core** API works with any JS/TS stack; an optional **React** entry injects the stylesheet.
 
 ```
 defineTokens({ themes, defaultTheme })
     → TokensApi { get, var, css, themes, themeNames, defaultTheme }
-    → <TokenSheet tokens={…} /> injects CSS into <style>
+    → tokens.css() anywhere, or <TokenSheet tokens={…} /> in React
     → class-based theme switching (.dark, .ocean, …) on <html>
 ```
 
 ## Install
 
 ```bash
-npm install @Omar-Ra7al/design-token-package
+npm install @design-token-package
 ```
 
-Peer dependencies: `react` and `react-dom` (`^18` or `^19`).
+Core needs no React. For `TokenSheet`, install peer deps `react` and `react-dom` (`^18` or `^19`).
 
 ## Quick start
 
+### Core (any framework)
+
 ```ts
-import { defineTokens, TokenSheet } from "@Omar-Ra7al/design-token-package";
-import type { TokensApi, TokenRef } from "@Omar-Ra7al/design-token-package";
+import { defineTokens } from '@Omar-Ra7al/design-token-package';
+import type { TokensApi, TokenRef } from '@Omar-Ra7al/design-token-package';
 
 export const tokens = defineTokens({
-  defaultTheme: "light",
+  defaultTheme: 'light',
   themes: {
     light: {
-      selector: ":root",
+      selector: ':root',
       tokens: {
-        background: "oklch(1 0 0)",
-        foreground: "oklch(0.145 0 0)",
-        primary: "oklch(0% 0 0)",
-        radius: "0.625rem",
+        background: 'oklch(1 0 0)',
+        foreground: 'oklch(0.145 0 0)',
+        primary: 'oklch(0% 0 0)',
+        radius: '0.625rem',
       },
     },
     dark: {
-      selector: ".dark",
+      selector: '.dark',
       tokens: {
-        background: "oklch(0% 0 0)",
-        foreground: "oklch(1 0 0)",
-        primary: "oklch(1 0 0)",
-        radius: "0.625rem",
+        background: 'oklch(0% 0 0)',
+        foreground: 'oklch(1 0 0)',
+        primary: 'oklch(1 0 0)',
+        radius: '0.625rem',
       },
     },
   },
 });
 
+// Inject however your stack prefers, e.g. a <style> tag or a CSS file:
+// document.head.insertAdjacentHTML("beforeend", `<style>${tokens.css()}</style>`);
+```
+
+### React
+
+```tsx
+import { TokenSheet } from '@Omar-Ra7al/design-token-package/react';
+import { tokens } from './tokens';
+
 // In your root layout:
-// <TokenSheet tokens={tokens} />
+<TokenSheet tokens={tokens} />;
 ```
 
 Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exist before paint. Toggle themes by adding/removing class names on `<html>` (e.g. with `next-themes`); that is **not** bundled here.
 
 ## Public API
 
-| Export | Role |
-|--------|------|
-| `defineTokens` | Factory → `TokensApi` |
+### Core (`@Omar-Ra7al/design-token-package`)
+
+| Export         | Role                                                                                         |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| `defineTokens` | Factory → `TokensApi`                                                                        |
+| Types          | `DefineTokensConfig`, `ThemeDefinition`, `TokenMap`, `TokensApi`, `TokenRef`, `OpacityScale` |
+
+### React (`@Omar-Ra7al/design-token-package/react`)
+
+| Export       | Role                                        |
+| ------------ | ------------------------------------------- |
 | `TokenSheet` | React component that injects `tokens.css()` |
-| Types | `DefineTokensConfig`, `ThemeDefinition`, `TokenMap`, `TokensApi`, `TokenRef`, `OpacityScale` |
 
 ### `TokensApi`
 
-| Member | Purpose |
-|--------|---------|
-| `themes` | Raw theme definitions |
-| `defaultTheme` | Default theme name |
-| `themeNames` | Theme name list (handy for theme switchers) |
-| `get(theme, ref)` | Resolved literal for a named theme |
-| `var(ref)` | `var(--key)` or opacity `color-mix(...)` — tracks the active theme |
-| `css()` | Full stylesheet string (`:root{…}.dark{…}`) |
+| Member            | Purpose                                                            |
+| ----------------- | ------------------------------------------------------------------ |
+| `themes`          | Raw theme definitions                                              |
+| `defaultTheme`    | Default theme name                                                 |
+| `themeNames`      | Theme name list (handy for theme switchers)                        |
+| `get(theme, ref)` | Resolved literal for a named theme                                 |
+| `var(ref)`        | `var(--key)` or opacity `color-mix(...)` — tracks the active theme |
+| `css()`           | Full stylesheet string (`:root{…}.dark{…}`)                        |
 
 ### Opacity refs
 
 ```ts
-tokens.get("light", "primary/20");
+tokens.get('light', 'primary/20');
 // color-mix(in oklch, … 20%, transparent)
 
-tokens.var("primary/50");
+tokens.var('primary/50');
 // color-mix(in oklch, var(--primary) 50%, transparent)
 ```
 
@@ -114,20 +133,20 @@ npm run build
 npm run pack:check
 ```
 
-Only symbols re-exported from `src/index.ts` are published. The concrete light/dark/ocean palette in `playground/` is a consumer demo and is **not** part of the package.
+Published entry points are `.` (core) and `./react`. The concrete light/dark/ocean palette in `playground/` is a consumer demo and is **not** part of the package.
 
 ## Scripts
 
-| Script | Purpose |
-|--------|---------|
-| `npm run dev` | Start the playground |
-| `npm run build` | Build the library into `dist/` |
-| `npm run test` / `test:watch` | Run tests |
-| `npm run typecheck` | TypeScript check |
-| `npm run lint` / `lint:fix` | ESLint |
-| `npm run format` / `format:check` | Prettier |
-| `npm run pack:check` | Preview files that would be published |
-| `npm run changeset` / `version` / `release` | Changesets publish flow |
+| Script                                      | Purpose                               |
+| ------------------------------------------- | ------------------------------------- |
+| `npm run dev`                               | Start the playground                  |
+| `npm run build`                             | Build the library into `dist/`        |
+| `npm run test` / `test:watch`               | Run tests                             |
+| `npm run typecheck`                         | TypeScript check                      |
+| `npm run lint` / `lint:fix`                 | ESLint                                |
+| `npm run format` / `format:check`           | Prettier                              |
+| `npm run pack:check`                        | Preview files that would be published |
+| `npm run changeset` / `version` / `release` | Changesets publish flow               |
 
 ## Rename this package
 

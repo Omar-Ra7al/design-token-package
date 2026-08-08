@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { TokenSheet } from "../../src/TokenSheet";
+import { TokenSheet } from "../../src/react";
 import { tokens, type AppThemeName } from "./demoTokens";
 
 const THEME_CLASSES = tokens.themeNames.filter((name) => name !== "light");
