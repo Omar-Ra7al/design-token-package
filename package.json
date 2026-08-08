@@ -1,6 +1,6 @@
 {
   "name": "@Omar-Ra7al/design-token-package",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Theme token system package",
   "license": "MIT",
   "type": "module",
