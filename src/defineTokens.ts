@@ -1,62 +1,46 @@
+import { TOKEN_CATEGORIES } from './categories';
 import type {
   ColorCategory,
   DefineTokensConfig,
   ResolvedTheme,
   SelectorStrategy,
   ThemeOverride,
-  TokenTree,
+  TokenCategory,
+  TokenSet,
   TokensApi,
 } from './types';
 
-/** A theme override as seen by the runtime: every branch is optional. */
-type OverrideTree = { [key: string]: string | OverrideTree | undefined };
-
 /** Only tokens in this category may carry an opacity step. */
-const COLOR_CATEGORY: ColorCategory = 'colors';
+const COLOR_CATEGORY: ColorCategory = 'color';
 
-function isTokenGroup<TGroup extends object>(value: string | TGroup | undefined): value is TGroup {
-  return typeof value === 'object' && value !== null;
+function categoriesOf(...sets: TokenSet[]): TokenCategory[] {
+  return [...new Set(sets.flatMap((set) => Object.keys(set)))] as TokenCategory[];
 }
 
 /**
- * Builds a complete token tree from the base tokens and a theme's overrides.
+ * Builds a complete token set from the base tokens and a theme's overrides.
  *
- * Groups are rebuilt as new objects, so themes never alias the base tokens or
- * each other, and a theme may introduce token names the base does not have.
+ * Each category is rebuilt as a new object, so themes never alias the base
+ * tokens or each other, and a theme may add token names, or whole categories,
+ * that the base does not have.
  */
-function resolveTokenTree(base: TokenTree, override: OverrideTree = {}): TokenTree {
-  const resolved: TokenTree = {};
+function resolveTokenSet(base: TokenSet, override: ThemeOverride = {}): TokenSet {
+  const resolved: TokenSet = {};
 
-  for (const [key, value] of Object.entries(base)) {
-    resolved[key] = isTokenGroup(value) ? resolveTokenTree(value) : value;
-  }
-
-  for (const [key, value] of Object.entries(override)) {
-    if (value === undefined) {
-      continue;
-    }
-
-    const inherited = resolved[key];
-
-    resolved[key] = isTokenGroup(value)
-      ? resolveTokenTree(isTokenGroup(inherited) ? inherited : {}, value)
-      : value;
+  for (const category of categoriesOf(base, override)) {
+    resolved[category] = { ...base[category], ...override[category] };
   }
 
   return resolved;
 }
 
-/** Turns nested paths into dash-joined variable names: `colors.primary` → `colors-primary`. */
-function flattenTokenTree(tree: TokenTree, prefix = ''): Record<string, string> {
+/** Names each token after its Tailwind namespace: `fontWeight.bold` → `font-weight-bold`. */
+function toCssVariables(tokens: TokenSet): Record<string, string> {
   const variables: Record<string, string> = {};
 
-  for (const [key, value] of Object.entries(tree)) {
-    const path = prefix ? `${prefix}-${key}` : key;
-
-    if (isTokenGroup(value)) {
-      Object.assign(variables, flattenTokenTree(value, path));
-    } else {
-      variables[path] = value;
+  for (const category of categoriesOf(tokens)) {
+    for (const [name, value] of Object.entries(tokens[category] ?? {})) {
+      variables[`${TOKEN_CATEGORIES[category]}-${name}`] = value;
     }
   }
 
@@ -82,7 +66,7 @@ function selectorFor(strategy: SelectorStrategy, theme: string): string {
   );
 }
 
-/** Serializes a token tree into a string of CSS variables. */
+/** Serializes CSS variables into the body of a rule. */
 function serializeCssVariables(variables: Record<string, string>): string {
   return Object.entries(variables)
     .map(([name, value]) => `--${name}:${value}`)
@@ -124,6 +108,8 @@ function withOpacity(color: string, opacity: number): string {
  *
  * `tokens` holds the default values; each theme lists only what it changes, and
  * the theme name becomes the selector value for the configured strategy.
+ * Categories come from a fixed Tailwind-compatible set, while the token names
+ * inside them are yours to choose.
  *
  * @param config - Selector strategy, base tokens, and theme overrides.
  *
@@ -132,35 +118,38 @@ function withOpacity(color: string, opacity: number): string {
  * const tokens = defineTokens({
  *   selector: "class",
  *   tokens: {
- *     colors: { primary: "#000", background: "#fff" },
+ *     color: { primary: "#000", background: "#fff" },
  *   },
  *   themes: {
  *     light: {},
- *     dark: { colors: { primary: "#fff", background: "#000" } },
+ *     dark: { color: { primary: "#fff", background: "#000" } },
  *   },
  * });
  *
  * tokens.css();
- * // ".light{--colors-primary:#000;--colors-background:#fff}
- * //  .dark{--colors-primary:#fff;--colors-background:#000}"
+ * // ":root{--color-primary:#000;--color-background:#fff}
+ * //  .light{--color-primary:#000;--color-background:#fff}
+ * //  .dark{--color-primary:#fff;--color-background:#000}"
  * ```
  */
 export function defineTokens<
-  TTokens extends TokenTree,
-  TThemes extends Record<string, ThemeOverride<TTokens>>,
+  TTokens extends TokenSet,
+  TThemes extends Record<string, ThemeOverride>,
 >({ selector, tokens, themes }: DefineTokensConfig<TTokens, TThemes>): TokensApi<TTokens, TThemes> {
   type ThemeName = keyof TThemes & string;
 
   const themeNames = Object.keys(themes) as ThemeName[];
   const resolvedThemes = {} as { [K in keyof TThemes]: ResolvedTheme<TTokens, TThemes[K]> };
   const themeVariables: Record<string, Record<string, string>> = {};
-  const rules: string[] = [];
+
+  const baseVariables = toCssVariables(tokens);
+  const rules = [`:root{${serializeCssVariables(baseVariables)}}`];
 
   for (const name of themeNames) {
-    const tree = resolveTokenTree(tokens, themes[name]);
-    const variables = flattenTokenTree(tree);
+    const resolved = resolveTokenSet(tokens, themes[name]);
+    const variables = toCssVariables(resolved);
 
-    resolvedThemes[name] = tree as ResolvedTheme<TTokens, TThemes[ThemeName]>;
+    resolvedThemes[name] = resolved as ResolvedTheme<TTokens, TThemes[ThemeName]>;
     themeVariables[name] = variables;
     rules.push(`${selectorFor(selector, name)}{${serializeCssVariables(variables)}}`);
   }
@@ -168,11 +157,12 @@ export function defineTokens<
   /**
    * Gets the resolved value of a token in a specific theme.
    *
-   * Token refs are dash-joined paths (`colors.primary` → `"colors-primary"`).
-   * Color tokens also take a Tailwind-style opacity step, as in `"colors-primary/50"`.
+   * Token refs join the category namespace and the token name
+   * (`color.primary` → `"color-primary"`). Color tokens also take a
+   * Tailwind-style opacity step, as in `"color-primary/50"`.
    *
    * @param theme - The theme to read from.
-   * @param ref - Token path, plus an opacity step for color tokens.
+   * @param ref - Token reference, plus an opacity step for color tokens.
    */
   function get(theme: ThemeName, ref: string): string {
     const { path, opacity } = parseTokenRef(ref);
@@ -193,8 +183,8 @@ export function defineTokens<
    * tokens.var("spacing-md");
    * // "var(--spacing-md)"
    *
-   * tokens.var("colors-primary/50");
-   * // "color-mix(in oklch, var(--colors-primary) 50%, transparent)"
+   * tokens.var("color-primary/50");
+   * // "color-mix(in oklch, var(--color-primary) 50%, transparent)"
    * ```
    */
   function cssVar(ref: string): string {
@@ -205,10 +195,12 @@ export function defineTokens<
   }
 
   /**
-   * Generates the stylesheet: one complete rule per theme.
+   * Generates the stylesheet: the base tokens on `:root`, then one complete
+   * rule per theme.
    *
-   * Every rule carries the full token set, so switching selectors swaps themes
-   * without relying on a base rule staying matched.
+   * The `:root` rule keeps every token defined when no theme selector is
+   * active, and comes first so the theme rules override it. Each theme rule
+   * carries the full token set, so switching selectors swaps the whole theme.
    */
   function css(): string {
     return rules.join('');

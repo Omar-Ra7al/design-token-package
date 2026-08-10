@@ -1,5 +1,26 @@
-/** Nested token values grouped by category; every leaf is a CSS value string. */
-export type TokenTree = { [key: string]: string | TokenTree };
+import type { TOKEN_CATEGORIES } from './categories';
+
+/** A token category, e.g. `"color"`, `"spacing"`, `"fontWeight"`. */
+export type TokenCategory = keyof typeof TOKEN_CATEGORIES;
+
+/** The CSS variable prefix a category emits, e.g. `fontWeight` → `"font-weight"`. */
+export type CategoryPrefix<TCategory extends TokenCategory> = (typeof TOKEN_CATEGORIES)[TCategory];
+
+/** One category's tokens: free-form names mapped to CSS values. */
+export type TokenGroup = Record<string, string>;
+
+/** A set of tokens. Categories are fixed; the names inside them are not. */
+export type TokenSet = { [K in TokenCategory]?: TokenGroup };
+
+/**
+ * A theme: the same shape as the base tokens, with everything optional.
+ *
+ * A theme may use any category, whether or not the base tokens define it.
+ */
+export type ThemeOverride = TokenSet;
+
+/** Turns any category the fixed set does not know about into a type error. */
+type ExactCategories<TTokens> = { [K in Exclude<keyof TTokens, TokenCategory>]: never };
 
 /**
  * How a theme name becomes a CSS selector.
@@ -10,73 +31,38 @@ export type TokenTree = { [key: string]: string | TokenTree };
  */
 export type SelectorStrategy = 'class' | 'id' | `data-${string}`;
 
-/**
- * Overrides for one token group.
- *
- * Members of the base group autocomplete, while the index signature keeps
- * theme-only token names such as `colors.myCustomColor` valid.
- */
-export type TokenGroupOverride<TGroup extends TokenTree> = {
-  [K in keyof TGroup]?: TGroup[K] extends TokenTree ? TokenGroupOverride<TGroup[K]> : string;
-} & { [key: string]: string | TokenTree | undefined };
-
-/**
- * A theme: a deep partial of the base tokens.
- *
- * Top-level keys are the base token categories, so they autocomplete; the token
- * names inside a category stay open.
- */
-export type ThemeOverride<TTokens extends TokenTree> = {
-  [K in keyof TTokens]?: TTokens[K] extends TokenTree ? TokenGroupOverride<TTokens[K]> : string;
-};
-
 export type DefineTokensConfig<
-  TTokens extends TokenTree,
-  TThemes extends Record<string, ThemeOverride<TTokens>>,
+  TTokens extends TokenSet,
+  TThemes extends Record<string, ThemeOverride>,
 > = {
   selector: SelectorStrategy;
-  tokens: TTokens;
-  themes: TThemes;
+  tokens: TTokens & ExactCategories<TTokens>;
+  themes: TThemes & { [K in keyof TThemes]: ThemeOverride & ExactCategories<TThemes[K]> };
 };
 
 /** Base tokens with a theme's overrides applied, keeping both sets of names. */
 export type ResolvedTheme<TTokens, TOverride> = {
-  [K in keyof TTokens | keyof TOverride]: K extends keyof TOverride
-    ? K extends keyof TTokens
-      ? ResolvedTokenValue<TTokens[K], TOverride[K]>
-      : TOverride[K]
-    : K extends keyof TTokens
-      ? TTokens[K]
-      : never;
+  [K in keyof TTokens | keyof TOverride]: (K extends keyof TTokens ? TTokens[K] : unknown) &
+    (K extends keyof TOverride ? TOverride[K] : unknown);
 };
 
-type ResolvedTokenValue<TToken, TOverride> = TToken extends TokenTree
-  ? TOverride extends TokenTree
-    ? ResolvedTheme<TToken, TOverride>
-    : TOverride
-  : TOverride;
-
-/** Dash-joined path to every leaf, e.g. `"typography-fontFamily-sans"`. */
-export type TokenPath<TTree, TPrefix extends string = ''> = {
-  [K in keyof TTree & string]: TTree[K] extends string
-    ? `${TPrefix}${K}`
-    : TTree[K] extends object
-      ? TokenPath<TTree[K], `${TPrefix}${K}-`>
-      : never;
-}[keyof TTree & string];
+/** Every token reference, e.g. `"color-primary"` or `"font-weight-bold"`. */
+export type TokenPath<TTokens> = {
+  [K in keyof TTokens & TokenCategory]: `${CategoryPrefix<K>}-${keyof TTokens[K] & string}`;
+}[keyof TTokens & TokenCategory];
 
 type ThemeTokenPaths<TThemes> = {
   [K in keyof TThemes]: TokenPath<TThemes[K]>;
 }[keyof TThemes];
 
-/** The token category whose values may carry an opacity step. */
-export type ColorCategory = 'colors';
+/** The one category whose values may carry an opacity step. */
+export type ColorCategory = 'color';
 
-/** Paths that accept an opacity step: the leaves of the `colors` category. */
+/** References that accept an opacity step: the tokens of the `color` category. */
 export type ColorTokenPath<TPath extends string> = Extract<TPath, `${ColorCategory}-${string}`>;
 
 /**
- * Tailwind-like opacity steps (percent). Used so `"colors-primary/20"` autocompletes.
+ * Tailwind-like opacity steps (percent). Used so `"color-primary/20"` autocompletes.
  * Runtime still accepts any integer 0–100; types prefer this scale.
  */
 export type OpacityScale =
@@ -103,14 +89,14 @@ export type OpacityScale =
   | 100;
 
 /**
- * `"colors-primary"` | `"colors-primary/20"` — every path autocompletes, but the
+ * `"color-primary"` | `"color-primary/20"` — every reference autocompletes, but the
  * opacity step is offered only for color tokens, since it compiles to `color-mix()`.
  */
 export type TokenRef<TPath extends string> = TPath | `${ColorTokenPath<TPath>}/${OpacityScale}`;
 
 export type TokensApi<
-  TTokens extends TokenTree,
-  TThemes extends Record<string, ThemeOverride<TTokens>>,
+  TTokens extends TokenSet,
+  TThemes extends Record<string, ThemeOverride>,
 > = {
   /** Base tokens with each theme's overrides applied. */
   themes: { [K in keyof TThemes]: ResolvedTheme<TTokens, TThemes[K]> };

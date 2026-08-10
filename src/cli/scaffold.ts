@@ -5,7 +5,7 @@ export const tokens = defineTokens({
   selector: "class",
 
   tokens: {
-    colors: {
+    color: {
       background: "oklch(1 0 0)",
       foreground: "oklch(0.145 0 0)",
       primary: "oklch(0% 0 0)",
@@ -20,7 +20,7 @@ export const tokens = defineTokens({
     light: {},
 
     dark: {
-      colors: {
+      color: {
         background: "oklch(0% 0 0)",
         foreground: "oklch(1 0 0)",
         primary: "oklch(1 0 0)",

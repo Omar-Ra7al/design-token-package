@@ -4,13 +4,13 @@ import { defineTokens } from '../../src/defineTokens';
  * Demo tokens for the playground.
  *
  * The base set doubles as the light theme; `dark` and `ocean` list only what
- * they change, and `ocean` also adds a token of its own.
+ * they change, and `ocean` also adds a color of its own.
  */
 export const tokens = defineTokens({
   selector: 'class',
 
   tokens: {
-    colors: {
+    color: {
       background: 'oklch(1 0 0)',
       foreground: 'oklch(0.145 0 0)',
       card: 'oklch(1 0 0)',
@@ -42,16 +42,15 @@ export const tokens = defineTokens({
       lg: '12px',
     },
 
-    typography: {
-      fontFamily: {
-        sans: 'system-ui, sans-serif',
-        mono: 'ui-monospace, monospace',
-      },
-      fontSize: {
-        sm: '14px',
-        md: '16px',
-        lg: '20px',
-      },
+    font: {
+      sans: 'system-ui, sans-serif',
+      mono: 'ui-monospace, monospace',
+    },
+
+    text: {
+      sm: '14px',
+      md: '16px',
+      lg: '20px',
     },
   },
 
@@ -59,7 +58,7 @@ export const tokens = defineTokens({
     light: {},
 
     dark: {
-      colors: {
+      color: {
         background: 'oklch(0% 0 0)',
         foreground: 'oklch(100% 0.00011 271.152)',
         card: 'oklch(0.205 0 0)',
@@ -77,7 +76,7 @@ export const tokens = defineTokens({
     },
 
     ocean: {
-      colors: {
+      color: {
         background: 'oklch(0.22 0.05 230)',
         foreground: 'oklch(0.95 0.02 200)',
         card: 'oklch(0.28 0.05 230)',
@@ -96,6 +95,9 @@ export const tokens = defineTokens({
       },
       spacing: {
         lg: '20px',
+      },
+      shadow: {
+        card: '0 2px 12px oklch(0.1 0.05 230 / 0.5)',
       },
     },
   },

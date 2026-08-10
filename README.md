@@ -79,7 +79,7 @@ export const tokens = defineTokens({
   selector: 'class',
 
   tokens: {
-    colors: {
+    color: {
       background: 'oklch(1 0 0)',
       foreground: 'oklch(0.145 0 0)',
       primary: 'oklch(0% 0 0)',
@@ -94,7 +94,7 @@ export const tokens = defineTokens({
     light: {},
 
     dark: {
-      colors: {
+      color: {
         background: 'oklch(0% 0 0)',
         foreground: 'oklch(1 0 0)',
         primary: 'oklch(1 0 0)',
@@ -107,24 +107,39 @@ export const tokens = defineTokens({
 // document.head.insertAdjacentHTML("beforeend", `<style>${tokens.css()}</style>`);
 ```
 
+### Token categories
+
+Tokens are exactly two levels deep: a **category** from a fixed list, then **token names** you choose. Unknown categories are a type error, so `colours: {}` never reaches your stylesheet.
+
+The categories mirror Tailwind v4's theme namespaces:
+
+`color`, `font`, `text`, `fontWeight`, `tracking`, `leading`, `tabSize`, `breakpoint`, `container`, `spacing`, `radius`, `shadow`, `insetShadow`, `dropShadow`, `blur`, `perspective`, `zoom`, `aspect`, `ease`, `animate`
+
+Category keys are camelCase, and the four multi-word ones emit Tailwind's kebab-case variable: `fontWeight.bold` → `--font-weight-bold`, and likewise for `tabSize`, `insetShadow`, and `dropShadow`. Every other key matches its variable prefix, so the generated CSS drops straight into Tailwind `@theme`.
+
 ### Base tokens and themes
 
 `tokens` holds the default values. A theme lists only what it changes, and everything else is inherited:
 
 ```css
+:root {
+  --color-background: oklch(1 0 0);
+  --color-primary: oklch(0% 0 0);
+  --radius-md: 0.625rem;
+}
 .light {
-  --colors-background: oklch(1 0 0);
-  --colors-primary: oklch(0% 0 0);
+  --color-background: oklch(1 0 0);
+  --color-primary: oklch(0% 0 0);
   --radius-md: 0.625rem;
 }
 .dark {
-  --colors-background: oklch(0% 0 0);
-  --colors-primary: oklch(1 0 0);
+  --color-background: oklch(0% 0 0);
+  --color-primary: oklch(1 0 0);
   --radius-md: 0.625rem;
 }
 ```
 
-Every rule carries the complete token set, so swapping the selector on `<html>` fully swaps the theme. Nested paths flatten into dash-joined custom properties: `colors.primary` → `--colors-primary`, `typography.fontFamily.sans` → `--typography-fontFamily-sans`.
+The base tokens are emitted on `:root` first, so every token has a value even before a theme class is applied. Each theme rule then carries the complete token set, so swapping the selector on `<html>` fully swaps the theme.
 
 The theme name is the selector value:
 
@@ -134,13 +149,13 @@ The theme name is the selector value:
 | `'id'`         | `#light{…}` `#dark{…}`                             |
 | `'data-theme'` | `[data-theme="light"]{…}` `[data-theme="dark"]{…}` |
 
-Token categories autocomplete from the base `tokens`, while token names inside a category stay open, so a theme can add its own:
+A theme gets the full category list whether or not the base defined it, and token names stay open, so a theme can add its own:
 
 ```ts
 themes: {
   dark: {
-    colors: { myCustomColor: '#123456' },
-    spacing: { huge: '100px' },
+    color: { myCustomColor: '#123456' },
+    shadow: { card: '0 2px 8px rgb(0 0 0 / 0.4)' },
   },
 }
 ```
@@ -185,7 +200,8 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 | Export         | Role                                                                                                                                                                                                                     |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `defineTokens` | Factory → `TokensApi`                                                                                                                                                                                                    |
-| Types          | `DefineTokensConfig`, `SelectorStrategy`, `TokenTree`, `ThemeOverride`, `TokenGroupOverride`, `ResolvedTheme`, `TokenPath`, `TokenRef`, `ColorCategory`, `ColorTokenPath`, `TokensApi`, `TokenCssSource`, `OpacityScale` |
+| `TOKEN_CATEGORIES` | The allowed categories mapped to their CSS variable prefix                                                                                                                                                           |
+| Types          | `DefineTokensConfig`, `SelectorStrategy`, `TokenCategory`, `CategoryPrefix`, `TokenGroup`, `TokenSet`, `ThemeOverride`, `ResolvedTheme`, `TokenPath`, `TokenRef`, `ColorCategory`, `ColorTokenPath`, `TokensApi`, `TokenCssSource`, `OpacityScale` |
 
 ### React (`@Omar-Ra7al/design-token-package/react`)
 
@@ -207,21 +223,21 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 | `themeNames`      | Theme name list (handy for theme switchers)                        |
 | `get(theme, ref)` | Resolved literal for a named theme                                 |
 | `var(ref)`        | `var(--key)` or opacity `color-mix(...)` — tracks the active theme |
-| `css()`           | Full stylesheet string (`.light{…}.dark{…}`)                       |
+| `css()`           | Full stylesheet string (`:root{…}.light{…}.dark{…}`)               |
 
 ### Opacity refs
 
 ```ts
-tokens.get('light', 'colors-primary/20');
+tokens.get('light', 'color-primary/20');
 // color-mix(in oklch, … 20%, transparent)
 
-tokens.var('colors-primary/50');
-// color-mix(in oklch, var(--colors-primary) 50%, transparent)
+tokens.var('color-primary/50');
+// color-mix(in oklch, var(--color-primary) 50%, transparent)
 ```
 
 Types autocomplete the usual 0–100 steps of 5. Runtime accepts any integer 0–100.
 
-Opacity compiles to `color-mix()`, so it is offered only for tokens in the `colors` category. Other categories autocomplete without the `/NN` step, and using one throws:
+Opacity compiles to `color-mix()`, so it is offered only for tokens in the `color` category. Other categories autocomplete without the `/NN` step, and using one throws:
 
 ```ts
 tokens.var('spacing-md'); // fine
@@ -248,22 +264,21 @@ Each public entry exposes `types` then `import` in `package.json` `exports`, so 
 
 ## Consuming in CSS / Tailwind
 
-Map tokens into Tailwind v4 `@theme` (or use raw CSS variables) in your app stylesheet:
+Variable names already match Tailwind v4's namespaces, so tokens map into `@theme` one-to-one:
 
 ```css
 @theme inline {
-  --color-background: var(--colors-background);
-  --color-foreground: var(--colors-foreground);
-  --color-primary: var(--colors-primary);
-  --radius-lg: var(--radius-md);
+  --color-background: var(--color-background);
+  --color-primary: var(--color-primary);
+  --radius-md: var(--radius-md);
 }
 ```
 
 Or use raw vars:
 
 ```tsx
-style={{ background: tokens.var("colors-background") }}
-className="bg-[var(--colors-background)]"
+style={{ background: tokens.var("color-background") }}
+className="bg-[var(--color-background)]"
 ```
 
 ## Local development

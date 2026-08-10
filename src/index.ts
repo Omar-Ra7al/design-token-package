@@ -1,6 +1,8 @@
+export { TOKEN_CATEGORIES } from './categories';
 export { defineTokens } from './defineTokens';
 export { injectTokens } from './injectTokens';
 export type {
+  CategoryPrefix,
   ColorCategory,
   ColorTokenPath,
   DefineTokensConfig,
@@ -8,10 +10,11 @@ export type {
   ResolvedTheme,
   SelectorStrategy,
   ThemeOverride,
+  TokenCategory,
   TokenCssSource,
-  TokenGroupOverride,
+  TokenGroup,
   TokenPath,
   TokenRef,
-  TokenTree,
+  TokenSet,
   TokensApi,
 } from './types';
