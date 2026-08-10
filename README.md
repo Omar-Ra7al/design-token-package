@@ -19,31 +19,36 @@ Core needs no React. For `TokenSheet`, install peer deps `react` and `react-dom`
 
 ## CLI
 
-Scaffold tokens (and optionally a CSS stub), then generate CSS when needed:
+Scaffold tokens interactively, then generate CSS when needed:
 
 ```bash
 npx design-tokens init
 npx design-tokens build
 ```
 
-`init` asks how you will use your tokens:
+`init` walks you through steps (no path arguments):
 
-- **CSS file** — creates `tokens.ts` + an empty `tokens.css` stub; later run `build` and import the CSS
-- **React / Next.js** — creates `tokens.ts` only; mount `<TokenSheet />` from `/react` or `/next` (no CSS file)
+1. **How will you use your tokens?** — CSS file, or React / Next.js
+2. **Where should we put files?** — defaults, or custom paths
+3. **Custom paths** (if chosen) — tokens file; CSS file only in CSS mode (suggested beside the tokens file)
+4. **Conflicts** — create missing / overwrite / exit when relevant files already exist
 
 Defaults:
 
 - If `src/` exists → `src/theme/tokens.ts` (+ `tokens.css` in CSS mode)
 - Otherwise → `theme/tokens.ts` (+ `tokens.css` in CSS mode)
 
-Custom paths (any location / filenames):
+- **CSS file** — creates `tokens.ts` + an empty `tokens.css` stub; later run `build` and import the CSS
+- **React / Next.js** — creates `tokens.ts` only; mount `<TokenSheet />` from `/react` or `/next` (no CSS file)
+
+`build` still accepts optional paths:
 
 ```bash
-npx design-tokens init ./src/design-system/theme.ts ./src/design-system/theme.css
+npx design-tokens build
 npx design-tokens build ./src/design-system/theme.ts ./src/design-system/theme.css
 ```
 
-`init` only creates/updates its own files — anything else in the folder is left alone. If a relevant file already exists, you can overwrite or exit; **Create missing files only** appears when at least one relevant file is still missing.
+`init` only creates/updates its own files — anything else in the folder is left alone. **Create missing files only** appears when at least one relevant file is still missing.
 
 After a successful CSS-mode init:
 

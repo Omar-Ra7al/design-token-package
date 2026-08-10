@@ -1,10 +1,17 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { dirname, relative } from 'node:path';
+import { dirname } from 'node:path';
 import * as p from '@clack/prompts';
 import { emptyCssStub, tokensScaffold } from './scaffold';
-import type { TokenPaths } from './paths';
+import {
+  defaultTokenPaths,
+  displayPath,
+  resolvePathArg,
+  suggestCssPath,
+  type TokenPaths,
+} from './paths';
 
 export type UsageMode = 'css' | 'react';
+export type PathMode = 'defaults' | 'custom';
 export type ConflictChoice = 'create-missing' | 'overwrite' | 'exit';
 
 export type ConflictContext = {
@@ -13,10 +20,13 @@ export type ConflictContext = {
 
 export type InitOptions = {
   cwd: string;
-  paths: TokenPaths;
   packageName: string;
   /** Injected for tests; defaults to clack select. */
   chooseUsage?: () => Promise<UsageMode | 'exit'>;
+  /** Injected for tests; defaults to clack select. */
+  choosePathMode?: (defaultsLabel: string) => Promise<PathMode | 'exit'>;
+  /** Injected for tests; defaults to clack text prompts. */
+  chooseCustomPaths?: (usage: UsageMode) => Promise<TokenPaths | 'exit'>;
   /** Injected for tests; defaults to clack select. */
   chooseConflict?: (ctx: ConflictContext) => Promise<ConflictChoice>;
 };
@@ -42,11 +52,6 @@ export function buildConflictOptions(hasMissing: boolean): Array<{
   return options;
 }
 
-function displayPath(cwd: string, absolutePath: string): string {
-  const rel = relative(cwd, absolutePath);
-  return rel.startsWith('..') ? absolutePath : rel || '.';
-}
-
 function ensureParentDir(filePath: string): void {
   mkdirSync(dirname(filePath), { recursive: true });
 }
@@ -66,6 +71,74 @@ async function defaultChooseUsage(): Promise<UsageMode | 'exit'> {
   }
 
   return choice;
+}
+
+async function defaultChoosePathMode(defaultsLabel: string): Promise<PathMode | 'exit'> {
+  const choice = await p.select({
+    message: 'Where should we put files?',
+    options: [
+      { value: 'defaults' as const, label: `Use defaults (${defaultsLabel})` },
+      { value: 'custom' as const, label: 'Custom paths' },
+    ],
+  });
+
+  if (p.isCancel(choice)) {
+    p.cancel('Cancelled.');
+    return 'exit';
+  }
+
+  return choice;
+}
+
+async function defaultChooseCustomPaths(
+  cwd: string,
+  usage: UsageMode,
+): Promise<TokenPaths | 'exit'> {
+  const defaults = defaultTokenPaths(cwd);
+  const tokensDefault = displayPath(cwd, defaults.tokensPath);
+
+  const tokensInput = await p.text({
+    message: 'Tokens file path',
+    placeholder: tokensDefault,
+    defaultValue: tokensDefault,
+    validate(value) {
+      if (value == null || !value.trim()) return 'Tokens path is required';
+    },
+  });
+
+  if (p.isCancel(tokensInput)) {
+    p.cancel('Cancelled.');
+    return 'exit';
+  }
+
+  const tokensPath = resolvePathArg(cwd, tokensInput);
+
+  if (usage === 'react') {
+    return {
+      tokensPath,
+      cssPath: suggestCssPath(tokensPath),
+    };
+  }
+
+  const cssDefault = displayPath(cwd, suggestCssPath(tokensPath));
+  const cssInput = await p.text({
+    message: 'CSS file path',
+    placeholder: cssDefault,
+    defaultValue: cssDefault,
+    validate(value) {
+      if (value == null || !value.trim()) return 'CSS path is required';
+    },
+  });
+
+  if (p.isCancel(cssInput)) {
+    p.cancel('Cancelled.');
+    return 'exit';
+  }
+
+  return {
+    tokensPath,
+    cssPath: resolvePathArg(cwd, cssInput),
+  };
 }
 
 async function defaultChooseConflict(ctx: ConflictContext): Promise<ConflictChoice> {
@@ -124,8 +197,11 @@ Custom paths:
 }
 
 export async function runInit(options: InitOptions): Promise<number> {
-  const { cwd, paths, packageName } = options;
+  const { cwd, packageName } = options;
   const chooseUsage = options.chooseUsage ?? defaultChooseUsage;
+  const choosePathMode = options.choosePathMode ?? defaultChoosePathMode;
+  const chooseCustomPaths =
+    options.chooseCustomPaths ?? ((usage: UsageMode) => defaultChooseCustomPaths(cwd, usage));
   const chooseConflict = options.chooseConflict ?? defaultChooseConflict;
 
   const usage = await chooseUsage();
@@ -133,13 +209,34 @@ export async function runInit(options: InitOptions): Promise<number> {
     return 0;
   }
 
+  const defaults = defaultTokenPaths(cwd);
+  const defaultsLabel =
+    usage === 'css'
+      ? `${displayPath(cwd, defaults.tokensPath)} + ${displayPath(cwd, defaults.cssPath)}`
+      : displayPath(cwd, defaults.tokensPath);
+
+  const pathMode = await choosePathMode(defaultsLabel);
+  if (pathMode === 'exit') {
+    return 0;
+  }
+
+  let paths: TokenPaths;
+  if (pathMode === 'defaults') {
+    paths = defaults;
+  } else {
+    const custom = await chooseCustomPaths(usage);
+    if (custom === 'exit') {
+      return 0;
+    }
+    paths = custom;
+  }
+
   const wantsCss = usage === 'css';
   const tokensExists = existsSync(paths.tokensPath);
   const cssExists = wantsCss && existsSync(paths.cssPath);
 
   const relevantExists = tokensExists || cssExists;
-  const hasMissing =
-    !tokensExists || (wantsCss && !existsSync(paths.cssPath));
+  const hasMissing = !tokensExists || (wantsCss && !existsSync(paths.cssPath));
 
   let writeTokens = true;
   let writeCss = wantsCss;

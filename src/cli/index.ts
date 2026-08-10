@@ -21,16 +21,13 @@ const pkg = packageJson();
 const cli = cac('design-tokens');
 
 cli
-  .command('init [tokens] [css]', 'Create tokens.ts and an empty tokens.css stub')
-  .action(async (tokens?: string, css?: string) => {
+  .command('init', 'Scaffold tokens via interactive steps')
+  .action(async () => {
     const cwd = process.cwd();
-    const args = [tokens, css].filter((v): v is string => v != null && v !== '');
 
     try {
-      const paths = resolveTokenPaths(cwd, args);
       const code = await runInit({
         cwd,
-        paths,
         packageName: pkg.name,
       });
       process.exitCode = code;

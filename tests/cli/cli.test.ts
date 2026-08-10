@@ -4,7 +4,12 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runBuild } from '../../src/cli/build';
 import { buildConflictOptions, runInit } from '../../src/cli/init';
-import { defaultThemeDir, resolveTokenPaths } from '../../src/cli/paths';
+import {
+  defaultThemeDir,
+  defaultTokenPaths,
+  resolveTokenPaths,
+  suggestCssPath,
+} from '../../src/cli/paths';
 import { emptyCssStub, tokensScaffold } from '../../src/cli/scaffold';
 
 function tempRoot(): string {
@@ -52,6 +57,14 @@ describe('resolveTokenPaths', () => {
   });
 });
 
+describe('suggestCssPath', () => {
+  it('replaces the tokens extension with .css', () => {
+    expect(suggestCssPath('/app/src/design-system/theme.ts')).toBe(
+      '/app/src/design-system/theme.css',
+    );
+  });
+});
+
 describe('buildConflictOptions', () => {
   it('includes create-missing only when files are missing', () => {
     expect(buildConflictOptions(true).map((o) => o.value)).toEqual([
@@ -67,16 +80,16 @@ describe('buildConflictOptions', () => {
 });
 
 describe('runInit', () => {
-  it('css mode creates scaffold tokens and empty css stub', async () => {
+  it('css mode with defaults creates scaffold tokens and empty css stub', async () => {
     const root = tempRoot();
     mkdirSync(join(root, 'src'));
-    const paths = resolveTokenPaths(root, []);
+    const paths = defaultTokenPaths(root);
 
     const code = await runInit({
       cwd: root,
-      paths,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      choosePathMode: async () => 'defaults',
     });
 
     expect(code).toBe(0);
@@ -86,16 +99,16 @@ describe('runInit', () => {
     expect(readFileSync(paths.cssPath, 'utf8')).toBe(emptyCssStub());
   });
 
-  it('react mode creates tokens only', async () => {
+  it('react mode with defaults creates tokens only', async () => {
     const root = tempRoot();
     mkdirSync(join(root, 'src'));
-    const paths = resolveTokenPaths(root, []);
+    const paths = defaultTokenPaths(root);
 
     const code = await runInit({
       cwd: root,
-      paths,
       packageName: 'design-token-package',
       chooseUsage: async () => 'react',
+      choosePathMode: async () => 'defaults',
     });
 
     expect(code).toBe(0);
@@ -105,17 +118,53 @@ describe('runInit', () => {
     expect(existsSync(paths.cssPath)).toBe(false);
   });
 
+  it('custom css paths ask for tokens and css', async () => {
+    const root = tempRoot();
+    const tokensPath = join(root, 'src', 'design-system', 'theme.ts');
+    const cssPath = join(root, 'src', 'design-system', 'theme.css');
+
+    const code = await runInit({
+      cwd: root,
+      packageName: 'design-token-package',
+      chooseUsage: async () => 'css',
+      choosePathMode: async () => 'custom',
+      chooseCustomPaths: async () => ({ tokensPath, cssPath }),
+    });
+
+    expect(code).toBe(0);
+    expect(readFileSync(tokensPath, 'utf8')).toBe(tokensScaffold('design-token-package'));
+    expect(readFileSync(cssPath, 'utf8')).toBe(emptyCssStub());
+  });
+
+  it('custom react paths only create tokens', async () => {
+    const root = tempRoot();
+    const tokensPath = join(root, 'src', 'design-system', 'theme.ts');
+    const cssPath = join(root, 'src', 'design-system', 'theme.css');
+
+    const code = await runInit({
+      cwd: root,
+      packageName: 'design-token-package',
+      chooseUsage: async () => 'react',
+      choosePathMode: async () => 'custom',
+      chooseCustomPaths: async () => ({ tokensPath, cssPath }),
+    });
+
+    expect(code).toBe(0);
+    expect(existsSync(tokensPath)).toBe(true);
+    expect(existsSync(cssPath)).toBe(false);
+  });
+
   it('react mode leaves existing css untouched', async () => {
     const root = tempRoot();
     mkdirSync(join(root, 'src', 'theme'), { recursive: true });
-    const paths = resolveTokenPaths(root, []);
+    const paths = defaultTokenPaths(root);
     writeFileSync(paths.cssPath, 'existing-css', 'utf8');
 
     await runInit({
       cwd: root,
-      paths,
       packageName: 'design-token-package',
       chooseUsage: async () => 'react',
+      choosePathMode: async () => 'defaults',
     });
 
     expect(readFileSync(paths.cssPath, 'utf8')).toBe('existing-css');
@@ -129,31 +178,28 @@ describe('runInit', () => {
     const unrelated = join(themeDir, 'notes.md');
     writeFileSync(unrelated, 'keep me', 'utf8');
 
-    const paths = resolveTokenPaths(root, []);
     await runInit({
       cwd: root,
-      paths,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      choosePathMode: async () => 'defaults',
     });
 
     expect(readFileSync(unrelated, 'utf8')).toBe('keep me');
-    expect(existsSync(paths.tokensPath)).toBe(true);
-    expect(existsSync(paths.cssPath)).toBe(true);
   });
 
   it('create-missing only writes absent files', async () => {
     const root = tempRoot();
     mkdirSync(join(root, 'src'));
-    const paths = resolveTokenPaths(root, []);
+    const paths = defaultTokenPaths(root);
     mkdirSync(join(root, 'src', 'theme'), { recursive: true });
     writeFileSync(paths.tokensPath, 'existing-tokens', 'utf8');
 
     const code = await runInit({
       cwd: root,
-      paths,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      choosePathMode: async () => 'defaults',
       chooseConflict: async (ctx) => {
         expect(ctx.hasMissing).toBe(true);
         return 'create-missing';
@@ -168,16 +214,16 @@ describe('runInit', () => {
   it('reports hasMissing false when both css-mode files exist', async () => {
     const root = tempRoot();
     mkdirSync(join(root, 'src'));
-    const paths = resolveTokenPaths(root, []);
+    const paths = defaultTokenPaths(root);
     mkdirSync(join(root, 'src', 'theme'), { recursive: true });
     writeFileSync(paths.tokensPath, 'old-tokens', 'utf8');
     writeFileSync(paths.cssPath, 'old-css', 'utf8');
 
     const code = await runInit({
       cwd: root,
-      paths,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      choosePathMode: async () => 'defaults',
       chooseConflict: async (ctx) => {
         expect(ctx.hasMissing).toBe(false);
         return 'exit';
@@ -192,16 +238,16 @@ describe('runInit', () => {
   it('overwrite rewrites both files in css mode', async () => {
     const root = tempRoot();
     mkdirSync(join(root, 'src'));
-    const paths = resolveTokenPaths(root, []);
+    const paths = defaultTokenPaths(root);
     mkdirSync(join(root, 'src', 'theme'), { recursive: true });
     writeFileSync(paths.tokensPath, 'old-tokens', 'utf8');
     writeFileSync(paths.cssPath, 'old-css', 'utf8');
 
     const code = await runInit({
       cwd: root,
-      paths,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      choosePathMode: async () => 'defaults',
       chooseConflict: async () => 'overwrite',
     });
 
@@ -215,15 +261,15 @@ describe('runInit', () => {
   it('exit leaves existing files unchanged', async () => {
     const root = tempRoot();
     mkdirSync(join(root, 'src'));
-    const paths = resolveTokenPaths(root, []);
+    const paths = defaultTokenPaths(root);
     mkdirSync(join(root, 'src', 'theme'), { recursive: true });
     writeFileSync(paths.tokensPath, 'old-tokens', 'utf8');
 
     const code = await runInit({
       cwd: root,
-      paths,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      choosePathMode: async () => 'defaults',
       chooseConflict: async () => 'exit',
     });
 
@@ -257,9 +303,11 @@ describe('runBuild', () => {
     });
 
     expect(code).toBe(0);
-    expect(readFileSync(cssPath, 'utf8')).toBe(
-      ':root{--primary:red}.dark{--primary:white}\n',
-    );
+    const written = readFileSync(cssPath, 'utf8');
+    expect(written).toContain('DO NOT EDIT THIS FILE');
+    expect(written).toContain('npx design-tokens build');
+    expect(written).toContain('npx design-tokens build theme/tokens.ts theme/tokens.css');
+    expect(written).toContain(':root{--primary:red}.dark{--primary:white}');
   });
 
   it('fails when tokens file is missing', async () => {
