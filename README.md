@@ -19,17 +19,22 @@ Core needs no React. For `TokenSheet`, install peer deps `react` and `react-dom`
 
 ## CLI
 
-Scaffold a tokens file and generate CSS:
+Scaffold tokens (and optionally a CSS stub), then generate CSS when needed:
 
 ```bash
 npx design-tokens init
 npx design-tokens build
 ```
 
+`init` asks how you will use your tokens:
+
+- **CSS file** — creates `tokens.ts` + an empty `tokens.css` stub; later run `build` and import the CSS
+- **React / Next.js** — creates `tokens.ts` only; mount `<TokenSheet />` from `/react` or `/next` (no CSS file)
+
 Defaults:
 
-- If `src/` exists → `src/theme/tokens.ts` + `src/theme/tokens.css`
-- Otherwise → `theme/tokens.ts` + `theme/tokens.css`
+- If `src/` exists → `src/theme/tokens.ts` (+ `tokens.css` in CSS mode)
+- Otherwise → `theme/tokens.ts` (+ `tokens.css` in CSS mode)
 
 Custom paths (any location / filenames):
 
@@ -38,9 +43,9 @@ npx design-tokens init ./src/design-system/theme.ts ./src/design-system/theme.cs
 npx design-tokens build ./src/design-system/theme.ts ./src/design-system/theme.css
 ```
 
-`init` only creates/updates those two files — anything else in the folder is left alone. If either file already exists, you can create missing files only, overwrite both, or exit.
+`init` only creates/updates its own files — anything else in the folder is left alone. If a relevant file already exists, you can overwrite or exit; **Create missing files only** appears when at least one relevant file is still missing.
 
-After a successful init:
+After a successful CSS-mode init:
 
 ```text
 ✓ Created src/theme/tokens.ts
