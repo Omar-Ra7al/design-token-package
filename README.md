@@ -182,9 +182,9 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 
 ### Core (`@Omar-Ra7al/design-token-package`)
 
-| Export         | Role                                                                                                                                                                                  |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `defineTokens` | Factory → `TokensApi`                                                                                                                                                                 |
+| Export         | Role                                                                                                                                                                                                                     |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `defineTokens` | Factory → `TokensApi`                                                                                                                                                                                                    |
 | Types          | `DefineTokensConfig`, `SelectorStrategy`, `TokenTree`, `ThemeOverride`, `TokenGroupOverride`, `ResolvedTheme`, `TokenPath`, `TokenRef`, `ColorCategory`, `ColorTokenPath`, `TokensApi`, `TokenCssSource`, `OpacityScale` |
 
 ### React (`@Omar-Ra7al/design-token-package/react`)

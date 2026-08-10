@@ -106,9 +106,7 @@ export type OpacityScale =
  * `"colors-primary"` | `"colors-primary/20"` — every path autocompletes, but the
  * opacity step is offered only for color tokens, since it compiles to `color-mix()`.
  */
-export type TokenRef<TPath extends string> =
-  | TPath
-  | `${ColorTokenPath<TPath>}/${OpacityScale}`;
+export type TokenRef<TPath extends string> = TPath | `${ColorTokenPath<TPath>}/${OpacityScale}`;
 
 export type TokensApi<
   TTokens extends TokenTree,
