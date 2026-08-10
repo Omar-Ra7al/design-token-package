@@ -3,10 +3,10 @@
 Typed TypeScript design tokens that compile to CSS custom properties per theme. The **core** API works with any JS/TS stack; an optional **React** entry injects the stylesheet.
 
 ```
-defineTokens({ themes, defaultTheme })
-    → TokensApi { get, var, css, themes, themeNames, defaultTheme }
+defineTokens({ selector, tokens, themes })
+    → TokensApi { get, var, css, themes, themeNames }
     → tokens.css() anywhere, or <TokenSheet tokens={…} /> in React
-    → class-based theme switching (.dark, .ocean, …) on <html>
+    → selector-based theme switching (.dark, #dark, [data-theme="dark"]) on <html>
 ```
 
 ## Install
@@ -76,24 +76,28 @@ import { defineTokens } from '@Omar-Ra7al/design-token-package';
 import type { TokensApi, TokenRef } from '@Omar-Ra7al/design-token-package';
 
 export const tokens = defineTokens({
-  defaultTheme: 'light',
-  themes: {
-    light: {
-      selector: ':root',
-      tokens: {
-        background: 'oklch(1 0 0)',
-        foreground: 'oklch(0.145 0 0)',
-        primary: 'oklch(0% 0 0)',
-        radius: '0.625rem',
-      },
+  selector: 'class',
+
+  tokens: {
+    colors: {
+      background: 'oklch(1 0 0)',
+      foreground: 'oklch(0.145 0 0)',
+      primary: 'oklch(0% 0 0)',
     },
+
+    radius: {
+      md: '0.625rem',
+    },
+  },
+
+  themes: {
+    light: {},
+
     dark: {
-      selector: '.dark',
-      tokens: {
+      colors: {
         background: 'oklch(0% 0 0)',
         foreground: 'oklch(1 0 0)',
         primary: 'oklch(1 0 0)',
-        radius: '0.625rem',
       },
     },
   },
@@ -101,6 +105,44 @@ export const tokens = defineTokens({
 
 // Inject however your stack prefers, e.g. a <style> tag or a CSS file:
 // document.head.insertAdjacentHTML("beforeend", `<style>${tokens.css()}</style>`);
+```
+
+### Base tokens and themes
+
+`tokens` holds the default values. A theme lists only what it changes, and everything else is inherited:
+
+```css
+.light {
+  --colors-background: oklch(1 0 0);
+  --colors-primary: oklch(0% 0 0);
+  --radius-md: 0.625rem;
+}
+.dark {
+  --colors-background: oklch(0% 0 0);
+  --colors-primary: oklch(1 0 0);
+  --radius-md: 0.625rem;
+}
+```
+
+Every rule carries the complete token set, so swapping the selector on `<html>` fully swaps the theme. Nested paths flatten into dash-joined custom properties: `colors.primary` → `--colors-primary`, `typography.fontFamily.sans` → `--typography-fontFamily-sans`.
+
+The theme name is the selector value:
+
+| `selector`     | Generated rules                                    |
+| -------------- | -------------------------------------------------- |
+| `'class'`      | `.light{…}` `.dark{…}`                             |
+| `'id'`         | `#light{…}` `#dark{…}`                             |
+| `'data-theme'` | `[data-theme="light"]{…}` `[data-theme="dark"]{…}` |
+
+Token categories autocomplete from the base `tokens`, while token names inside a category stay open, so a theme can add its own:
+
+```ts
+themes: {
+  dark: {
+    colors: { myCustomColor: '#123456' },
+    spacing: { huge: '100px' },
+  },
+}
 ```
 
 ### React
@@ -140,10 +182,10 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 
 ### Core (`@Omar-Ra7al/design-token-package`)
 
-| Export         | Role                                                                                         |
-| -------------- | -------------------------------------------------------------------------------------------- |
-| `defineTokens` | Factory → `TokensApi`                                                                        |
-| Types          | `DefineTokensConfig`, `ThemeDefinition`, `TokenMap`, `TokensApi`, `TokenRef`, `OpacityScale` |
+| Export         | Role                                                                                                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `defineTokens` | Factory → `TokensApi`                                                                                                                                                                 |
+| Types          | `DefineTokensConfig`, `SelectorStrategy`, `TokenTree`, `ThemeOverride`, `TokenGroupOverride`, `ResolvedTheme`, `TokenPath`, `TokenRef`, `ColorCategory`, `ColorTokenPath`, `TokensApi`, `TokenCssSource`, `OpacityScale` |
 
 ### React (`@Omar-Ra7al/design-token-package/react`)
 
@@ -153,50 +195,56 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 
 ### Next.js (`@Omar-Ra7al/design-token-package/next`)
 
-| Export       | Role                                                 |
-| ------------ | ---------------------------------------------------- |
+| Export       | Role                                              |
+| ------------ | ------------------------------------------------- |
 | `TokenSheet` | Same component as `./react` (for Next.js imports) |
 
 ### `TokensApi`
 
 | Member            | Purpose                                                            |
 | ----------------- | ------------------------------------------------------------------ |
-| `themes`          | Raw theme definitions                                              |
-| `defaultTheme`    | Default theme name                                                 |
+| `themes`          | Base tokens with each theme's overrides applied                    |
 | `themeNames`      | Theme name list (handy for theme switchers)                        |
 | `get(theme, ref)` | Resolved literal for a named theme                                 |
 | `var(ref)`        | `var(--key)` or opacity `color-mix(...)` — tracks the active theme |
-| `css()`           | Full stylesheet string (`:root{…}.dark{…}`)                        |
+| `css()`           | Full stylesheet string (`.light{…}.dark{…}`)                       |
 
 ### Opacity refs
 
 ```ts
-tokens.get('light', 'primary/20');
+tokens.get('light', 'colors-primary/20');
 // color-mix(in oklch, … 20%, transparent)
 
-tokens.var('primary/50');
-// color-mix(in oklch, var(--primary) 50%, transparent)
+tokens.var('colors-primary/50');
+// color-mix(in oklch, var(--colors-primary) 50%, transparent)
 ```
 
 Types autocomplete the usual 0–100 steps of 5. Runtime accepts any integer 0–100.
+
+Opacity compiles to `color-mix()`, so it is offered only for tokens in the `colors` category. Other categories autocomplete without the `/NN` step, and using one throws:
+
+```ts
+tokens.var('spacing-md'); // fine
+tokens.var('spacing-md/20'); // type error, and throws at runtime
+```
 
 ## Package formats
 
 The published package is **ESM-only** (no CommonJS):
 
-| Artifact | Role |
-| -------- | ---- |
-| `dist/**/*.js` | ESM runtime (`import`) |
-| `dist/**/*.d.ts` | TypeScript / IDE autocomplete |
-| `dist/cli/index.js` | CLI bin (ESM) |
+| Artifact            | Role                          |
+| ------------------- | ----------------------------- |
+| `dist/**/*.js`      | ESM runtime (`import`)        |
+| `dist/**/*.d.ts`    | TypeScript / IDE autocomplete |
+| `dist/cli/index.js` | CLI bin (ESM)                 |
 
 Each public entry exposes `types` then `import` in `package.json` `exports`, so editors resolve autocomplete for TypeScript and JavaScript consumers.
 
-| Entry | Import |
-| ----- | ------ |
-| Core (any framework / vanilla JS) | `design-token-package` |
-| React | `design-token-package/react` |
-| Next.js | `design-token-package/next` |
+| Entry                             | Import                       |
+| --------------------------------- | ---------------------------- |
+| Core (any framework / vanilla JS) | `design-token-package`       |
+| React                             | `design-token-package/react` |
+| Next.js                           | `design-token-package/next`  |
 
 ## Consuming in CSS / Tailwind
 
@@ -204,18 +252,18 @@ Map tokens into Tailwind v4 `@theme` (or use raw CSS variables) in your app styl
 
 ```css
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: var(--primary);
-  --radius-lg: var(--radius);
+  --color-background: var(--colors-background);
+  --color-foreground: var(--colors-foreground);
+  --color-primary: var(--colors-primary);
+  --radius-lg: var(--radius-md);
 }
 ```
 
 Or use raw vars:
 
 ```tsx
-style={{ background: tokens.var("background") }}
-className="bg-[var(--background)]"
+style={{ background: tokens.var("colors-background") }}
+className="bg-[var(--colors-background)]"
 ```
 
 ## Local development

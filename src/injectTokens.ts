@@ -1,8 +1,6 @@
-import type { TokensApi, ThemeDefinition } from './types';
+import type { TokenCssSource } from './types';
 
 const STYLE_ATTRIBUTE = 'data-design-tokens';
-
-type TokenSystem = Pick<TokensApi<Record<string, ThemeDefinition>>, 'css'>;
 
 /**
  * Injects the generated token CSS into the document `<head>`.
@@ -17,7 +15,7 @@ type TokenSystem = Pick<TokensApi<Record<string, ThemeDefinition>>, 'css'>;
  *
  * @returns A cleanup function that removes the injected stylesheet.
  */
-export function injectTokens(tokens: TokenSystem): () => void {
+export function injectTokens(tokens: TokenCssSource): () => void {
   if (typeof document === 'undefined') {
     return () => {};
   }

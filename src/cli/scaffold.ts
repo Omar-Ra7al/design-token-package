@@ -2,24 +2,28 @@ export function tokensScaffold(packageName: string): string {
   return `import { defineTokens } from "${packageName}";
 
 export const tokens = defineTokens({
-  defaultTheme: "light",
-  themes: {
-    light: {
-      selector: ":root",
-      tokens: {
-        background: "oklch(1 0 0)",
-        foreground: "oklch(0.145 0 0)",
-        primary: "oklch(0% 0 0)",
-        radius: "0.625rem",
-      },
+  selector: "class",
+
+  tokens: {
+    colors: {
+      background: "oklch(1 0 0)",
+      foreground: "oklch(0.145 0 0)",
+      primary: "oklch(0% 0 0)",
     },
+
+    radius: {
+      md: "0.625rem",
+    },
+  },
+
+  themes: {
+    light: {},
+
     dark: {
-      selector: ".dark",
-      tokens: {
+      colors: {
         background: "oklch(0% 0 0)",
         foreground: "oklch(1 0 0)",
         primary: "oklch(1 0 0)",
-        radius: "0.625rem",
       },
     },
   },

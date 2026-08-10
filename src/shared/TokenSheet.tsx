@@ -1,9 +1,5 @@
-import type { ThemeDefinition, TokensApi } from '../types';
+import type { TokenCssSource } from '../types';
 
-export function TokenSheet<TThemes extends Record<string, ThemeDefinition>>({
-  tokens,
-}: {
-  tokens: TokensApi<TThemes>;
-}) {
+export function TokenSheet({ tokens }: { tokens: TokenCssSource }) {
   return <style dangerouslySetInnerHTML={{ __html: tokens.css() }} />;
 }

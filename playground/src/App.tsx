@@ -2,15 +2,13 @@ import { useEffect, useState } from 'react';
 import { TokenSheet } from '../../src/react';
 import { tokens, type AppThemeName } from './demoTokens';
 
-const THEME_CLASSES = tokens.themeNames.filter((name) => name !== 'light');
-
 export function App() {
-  const [theme, setTheme] = useState<AppThemeName>(tokens.defaultTheme);
+  const [theme, setTheme] = useState<AppThemeName>('light');
 
   useEffect(() => {
     const root = document.documentElement;
 
-    for (const name of THEME_CLASSES) {
+    for (const name of tokens.themeNames) {
       root.classList.toggle(name, name === theme);
     }
   }, [theme]);
@@ -20,12 +18,12 @@ export function App() {
       <TokenSheet tokens={tokens} />
       <main
         style={{
-          fontFamily: 'system-ui, sans-serif',
+          fontFamily: tokens.var('typography-fontFamily-sans'),
           padding: '2rem',
           lineHeight: 1.5,
           minHeight: '100vh',
-          background: tokens.var('background'),
-          color: tokens.var('foreground'),
+          background: tokens.var('colors-background'),
+          color: tokens.var('colors-foreground'),
         }}
       >
         <h1>Design token playground</h1>
@@ -44,13 +42,14 @@ export function App() {
                 onClick={() => setTheme(name)}
                 style={{
                   padding: '0.5rem 0.75rem',
-                  border: `1px solid ${tokens.var('border')}`,
-                  borderRadius: tokens.var('radius'),
-                  background: theme === name ? tokens.var('primary') : tokens.var('secondary'),
+                  border: `1px solid ${tokens.var('colors-border')}`,
+                  borderRadius: tokens.var('radius-md'),
+                  background:
+                    theme === name ? tokens.var('colors-primary') : tokens.var('colors-secondary'),
                   color:
                     theme === name
-                      ? tokens.var('primary-foreground')
-                      : tokens.var('secondary-foreground'),
+                      ? tokens.var('colors-primaryForeground')
+                      : tokens.var('colors-secondaryForeground'),
                   cursor: 'pointer',
                 }}
               >
@@ -64,20 +63,24 @@ export function App() {
           <h2>API demos</h2>
           <ul>
             <li>
-              <code>tokens.get(&quot;light&quot;, &quot;primary&quot;)</code> →{' '}
-              <code>{tokens.get('light', 'primary')}</code>
+              <code>tokens.get(&quot;light&quot;, &quot;colors-primary&quot;)</code> →{' '}
+              <code>{tokens.get('light', 'colors-primary')}</code>
             </li>
             <li>
-              <code>tokens.get(&quot;dark&quot;, &quot;primary/20&quot;)</code> →{' '}
-              <code>{tokens.get('dark', 'primary/20')}</code>
+              <code>tokens.get(&quot;dark&quot;, &quot;colors-primary/20&quot;)</code> →{' '}
+              <code>{tokens.get('dark', 'colors-primary/20')}</code>
             </li>
             <li>
-              <code>tokens.var(&quot;background&quot;)</code> →{' '}
-              <code>{tokens.var('background')}</code>
+              <code>tokens.get(&quot;dark&quot;, &quot;typography-fontSize-lg&quot;)</code> →{' '}
+              <code>{tokens.get('dark', 'typography-fontSize-lg')}</code>
             </li>
             <li>
-              <code>tokens.var(&quot;accent/50&quot;)</code> →{' '}
-              <code>{tokens.var('accent/50')}</code>
+              <code>tokens.get(&quot;ocean&quot;, &quot;colors-seafoam&quot;)</code> →{' '}
+              <code>{tokens.get('ocean', 'colors-seafoam')}</code>
+            </li>
+            <li>
+              <code>tokens.var(&quot;colors-accent/50&quot;)</code> →{' '}
+              <code>{tokens.var('colors-accent/50')}</code>
             </li>
           </ul>
         </section>
@@ -85,24 +88,25 @@ export function App() {
         <section
           style={{
             marginTop: '1.5rem',
-            padding: tokens.var('space-4'),
-            borderRadius: tokens.var('radius'),
-            background: tokens.var('card'),
-            color: tokens.var('card-foreground'),
-            border: `1px solid ${tokens.var('border')}`,
+            padding: tokens.var('spacing-lg'),
+            borderRadius: tokens.var('radius-md'),
+            background: tokens.var('colors-card'),
+            color: tokens.var('colors-cardForeground'),
+            border: `1px solid ${tokens.var('colors-border')}`,
           }}
         >
           <h2 style={{ marginTop: 0 }}>Live surface</h2>
           <p style={{ marginBottom: 0 }}>
-            Background uses <code>var(--background)</code> from the active theme. Accent swatch:{' '}
+            Background uses <code>var(--colors-background)</code> from the active theme. Accent
+            swatch:{' '}
             <span
               style={{
                 display: 'inline-block',
                 width: '1.25rem',
                 height: '1.25rem',
                 verticalAlign: 'middle',
-                borderRadius: '4px',
-                background: tokens.var('accent'),
+                borderRadius: tokens.var('radius-sm'),
+                background: tokens.var('colors-accent'),
               }}
             />
           </p>
