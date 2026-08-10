@@ -1,41 +1,63 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { cac } from "cac";
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cac } from 'cac';
+import { runBuild } from './build';
+import { runInit } from './init';
+import { resolveTokenPaths } from './paths';
 
-import { runBuild } from "./build";
-import { runInit } from "./init";
-
-function packageVersion(): string {
-  try {
-    const here = dirname(fileURLToPath(import.meta.url));
-    const pkg = JSON.parse(
-      readFileSync(join(here, "../../package.json"), "utf8"),
-    ) as { version?: string };
-    return pkg.version ?? "0.0.0";
-  } catch {
-    return "0.0.0";
-  }
+function packageJson(): { name: string; version: string } {
+  const here = dirname(fileURLToPath(import.meta.url));
+  // dist/cli/index.js → package root
+  const root = join(here, '..', '..');
+  return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+    name: string;
+    version: string;
+  };
 }
 
-const cli = cac("design-tokens");
+const pkg = packageJson();
+const cli = cac('design-tokens');
 
 cli
-  .command("init", "Initialize design tokens in the current project")
-  .option("-y, --yes", "Skip prompts and use defaults")
-  .action(async (options: { yes?: boolean }) => {
-    await runInit({ yes: Boolean(options.yes) });
+  .command('init [tokens] [css]', 'Create tokens.ts and an empty tokens.css stub')
+  .action(async (tokens?: string, css?: string) => {
+    const cwd = process.cwd();
+    const args = [tokens, css].filter((v): v is string => v != null && v !== '');
+
+    try {
+      const paths = resolveTokenPaths(cwd, args);
+      const code = await runInit({
+        cwd,
+        paths,
+        packageName: pkg.name,
+      });
+      process.exitCode = code;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(message);
+      process.exitCode = 1;
+    }
   });
 
 cli
-  .command("build", "Regenerate tokens.css from the token definition")
-  .action(async () => {
-    const { outputPath } = await runBuild();
-    console.log(`✓ Generated ${outputPath}`);
+  .command('build [tokens] [css]', 'Generate CSS from your tokens file')
+  .action(async (tokens?: string, css?: string) => {
+    const cwd = process.cwd();
+    const args = [tokens, css].filter((v): v is string => v != null && v !== '');
+
+    try {
+      const paths = resolveTokenPaths(cwd, args);
+      const code = await runBuild({ cwd, paths });
+      process.exitCode = code;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(message);
+      process.exitCode = 1;
+    }
   });
 
 cli.help();
-cli.version(packageVersion());
-
+cli.version(pkg.version);
 cli.parse();

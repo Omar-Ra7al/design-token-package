@@ -1,380 +1,232 @@
-// @vitest-environment node
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { runBuild } from '../../src/cli/build';
+import { runInit } from '../../src/cli/init';
+import { defaultThemeDir, resolveTokenPaths } from '../../src/cli/paths';
+import { emptyCssStub, tokensScaffold } from '../../src/cli/scaffold';
 
-import { runBuild } from "../../src/cli/build";
-import {
-  conventionConfig,
-  formatConfigFile,
-  isConventionConfig,
-  loadConfig,
-  writeConfigFile,
-} from "../../src/cli/config";
-import {
-  detectProject,
-  formatDetectionSummary,
-} from "../../src/cli/detect";
-import { hasTokensImport, injectTokensImport } from "../../src/cli/inject";
-import { runInit } from "../../src/cli/init";
-import {
-  defaultThemeDir,
-  findStylesheetCandidates,
-  relativeImportPath,
-} from "../../src/cli/paths";
-import {
-  formatTailwindThemeBlock,
-  mapTokenKeyToThemeVar,
-} from "../../src/cli/tailwind-theme";
-
-const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const PACKAGE_NAME = "design-token-package";
-
-const tempDirs: string[] = [];
-
-function makeTempProject(options?: {
-  withSrc?: boolean;
-  stylesheets?: string[];
-  packageJson?: Record<string, unknown>;
-}): string {
-  const dir = mkdtempSync(join(tmpdir(), "design-tokens-cli-"));
-  tempDirs.push(dir);
-  writeFileSync(
-    join(dir, "package.json"),
-    JSON.stringify({
-      name: "temp-app",
-      type: "module",
-      ...options?.packageJson,
-    }),
-  );
-
-  mkdirSync(join(dir, "node_modules"), { recursive: true });
-  symlinkSync(packageRoot, join(dir, "node_modules", PACKAGE_NAME), "dir");
-
-  if (options?.withSrc) {
-    mkdirSync(join(dir, "src"), { recursive: true });
-  }
-
-  for (const sheet of options?.stylesheets ?? []) {
-    const abs = join(dir, sheet);
-    mkdirSync(dirname(abs), { recursive: true });
-    writeFileSync(abs, "/* app styles */\n", "utf8");
-  }
-
-  return dir;
+function tempRoot(): string {
+  return mkdtempSync(join(tmpdir(), 'design-tokens-cli-'));
 }
 
+const roots: string[] = [];
+
 afterEach(() => {
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) rmSync(dir, { recursive: true, force: true });
-  }
+  vi.restoreAllMocks();
 });
 
-describe("paths", () => {
-  it("uses src/theme when src exists", () => {
-    const root = makeTempProject({ withSrc: true });
-    expect(defaultThemeDir(root)).toBe("src/theme");
-    expect(conventionConfig(root).tokens.file).toBe("src/theme/tokens.ts");
+describe('resolveTokenPaths', () => {
+  it('defaults to src/theme when src exists', () => {
+    const root = tempRoot();
+    roots.push(root);
+    mkdirSync(join(root, 'src'));
+
+    const paths = resolveTokenPaths(root, []);
+    expect(paths.tokensPath).toBe(join(root, 'src', 'theme', 'tokens.ts'));
+    expect(paths.cssPath).toBe(join(root, 'src', 'theme', 'tokens.css'));
+    expect(defaultThemeDir(root)).toBe(join(root, 'src', 'theme'));
   });
 
-  it("uses theme when src is absent", () => {
-    const root = makeTempProject();
-    expect(defaultThemeDir(root)).toBe("theme");
-    expect(conventionConfig(root).output.css).toBe("theme/tokens.css");
+  it('defaults to theme at root when src is missing', () => {
+    const root = tempRoot();
+    roots.push(root);
+
+    const paths = resolveTokenPaths(root, []);
+    expect(paths.tokensPath).toBe(join(root, 'theme', 'tokens.ts'));
+    expect(paths.cssPath).toBe(join(root, 'theme', 'tokens.css'));
   });
 
-  it("finds all stylesheet candidates in search order", () => {
-    const root = makeTempProject({
-      withSrc: true,
-      stylesheets: ["src/index.css", "src/app/globals.css", "styles/globals.css"],
-    });
-    expect(findStylesheetCandidates(root)).toEqual([
-      "src/app/globals.css",
-      "src/index.css",
-      "styles/globals.css",
+  it('accepts custom tokens and css paths', () => {
+    const root = tempRoot();
+    roots.push(root);
+
+    const paths = resolveTokenPaths(root, [
+      './src/design-system/theme.ts',
+      './src/design-system/theme.css',
     ]);
+
+    expect(paths.tokensPath).toBe(join(root, 'src', 'design-system', 'theme.ts'));
+    expect(paths.cssPath).toBe(join(root, 'src', 'design-system', 'theme.css'));
   });
 
-  it("computes relative CSS import paths", () => {
-    expect(
-      relativeImportPath(
-        "/app/src/app/globals.css",
-        "/app/src/theme/tokens.css",
-      ),
-    ).toBe("../theme/tokens.css");
-  });
-});
-
-describe("detect", () => {
-  it("reports no Tailwind when absent", () => {
-    const root = makeTempProject({
-      packageJson: { dependencies: { react: "^19.0.0", next: "^15.0.0" } },
-    });
-    const detection = detectProject(root);
-    expect(detection.framework).toBe("Next.js");
-    expect(detection.hasReact).toBe(true);
-    expect(detection.tailwind.present).toBe(false);
-    expect(formatDetectionSummary(detection)).toContain("Next.js");
-  });
-
-  it("detects Tailwind v4 from package range", () => {
-    const root = makeTempProject({
-      packageJson: {
-        dependencies: { vite: "^6.0.0" },
-        devDependencies: { tailwindcss: "^4.1.0" },
-      },
-    });
-    const detection = detectProject(root);
-    expect(detection.framework).toBe("Vite");
-    expect(detection.tailwind.present).toBe(true);
-    expect(detection.tailwind.major).toBe("v4");
-  });
-
-  it("detects Tailwind v3 from package range", () => {
-    const root = makeTempProject({
-      packageJson: {
-        devDependencies: { tailwindcss: "^3.4.0" },
-      },
-    });
-    const detection = detectProject(root);
-    expect(detection.tailwind.present).toBe(true);
-    expect(detection.tailwind.major).toBe("v3");
+  it('rejects a single path argument', () => {
+    const root = tempRoot();
+    roots.push(root);
+    expect(() => resolveTokenPaths(root, ['./only.ts'])).toThrow(/0 or 2 path/);
   });
 });
 
-describe("tailwind-theme", () => {
-  it("maps keys to theme variables", () => {
-    expect(mapTokenKeyToThemeVar("background")).toBe("--color-background");
-    expect(mapTokenKeyToThemeVar("radius")).toBe("--radius-lg");
-    expect(mapTokenKeyToThemeVar("radius-sm")).toBe("--radius-sm");
-    expect(mapTokenKeyToThemeVar("font-sans")).toBe("--font-sans");
-  });
+describe('runInit', () => {
+  it('creates scaffold tokens and empty css stub', async () => {
+    const root = tempRoot();
+    roots.push(root);
+    mkdirSync(join(root, 'src'));
+    const paths = resolveTokenPaths(root, []);
 
-  it("formats @theme inline block", () => {
-    const block = formatTailwindThemeBlock(["background", "radius"]);
-    expect(block).toContain("@theme inline");
-    expect(block).toContain("--color-background: var(--background);");
-    expect(block).toContain("--radius-lg: var(--radius);");
-  });
-});
-
-describe("inject", () => {
-  it("adds import once and is idempotent", () => {
-    const root = makeTempProject({
-      withSrc: true,
-      stylesheets: ["src/app/globals.css"],
+    const code = await runInit({
+      cwd: root,
+      paths,
+      packageName: 'design-token-package',
     });
-    const sheet = join(root, "src/app/globals.css");
-    const css = join(root, "src/theme/tokens.css");
-    mkdirSync(dirname(css), { recursive: true });
-    writeFileSync(css, "/* tokens */\n");
 
-    const first = injectTokensImport(sheet, css);
-    expect(first.status).toBe("added");
-    expect(readFileSync(sheet, "utf8")).toContain(
-      '@import "../theme/tokens.css";',
+    expect(code).toBe(0);
+    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(
+      tokensScaffold('design-token-package'),
     );
+    expect(readFileSync(paths.cssPath, 'utf8')).toBe(emptyCssStub());
+  });
 
-    const second = injectTokensImport(sheet, css);
-    expect(second.status).toBe("exists");
-    expect(readFileSync(sheet, "utf8").match(/@import/g)?.length).toBe(1);
-    expect(hasTokensImport(sheet, css)).toBe(true);
+  it('leaves unrelated files untouched', async () => {
+    const root = tempRoot();
+    roots.push(root);
+    const themeDir = join(root, 'theme');
+    mkdirSync(themeDir, { recursive: true });
+    const unrelated = join(themeDir, 'notes.md');
+    writeFileSync(unrelated, 'keep me', 'utf8');
+
+    const paths = resolveTokenPaths(root, []);
+    await runInit({
+      cwd: root,
+      paths,
+      packageName: 'design-token-package',
+    });
+
+    expect(readFileSync(unrelated, 'utf8')).toBe('keep me');
+    expect(existsSync(paths.tokensPath)).toBe(true);
+    expect(existsSync(paths.cssPath)).toBe(true);
+  });
+
+  it('create-missing only writes absent files', async () => {
+    const root = tempRoot();
+    roots.push(root);
+    mkdirSync(join(root, 'src'));
+    const paths = resolveTokenPaths(root, []);
+    mkdirSync(join(root, 'src', 'theme'), { recursive: true });
+    writeFileSync(paths.tokensPath, 'existing-tokens', 'utf8');
+
+    const code = await runInit({
+      cwd: root,
+      paths,
+      packageName: 'design-token-package',
+      chooseConflict: async () => 'create-missing',
+    });
+
+    expect(code).toBe(0);
+    expect(readFileSync(paths.tokensPath, 'utf8')).toBe('existing-tokens');
+    expect(readFileSync(paths.cssPath, 'utf8')).toBe(emptyCssStub());
+  });
+
+  it('overwrite rewrites both files', async () => {
+    const root = tempRoot();
+    roots.push(root);
+    mkdirSync(join(root, 'src'));
+    const paths = resolveTokenPaths(root, []);
+    mkdirSync(join(root, 'src', 'theme'), { recursive: true });
+    writeFileSync(paths.tokensPath, 'old-tokens', 'utf8');
+    writeFileSync(paths.cssPath, 'old-css', 'utf8');
+
+    const code = await runInit({
+      cwd: root,
+      paths,
+      packageName: 'design-token-package',
+      chooseConflict: async () => 'overwrite',
+    });
+
+    expect(code).toBe(0);
+    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(
+      tokensScaffold('design-token-package'),
+    );
+    expect(readFileSync(paths.cssPath, 'utf8')).toBe(emptyCssStub());
+  });
+
+  it('exit leaves existing files unchanged', async () => {
+    const root = tempRoot();
+    roots.push(root);
+    mkdirSync(join(root, 'src'));
+    const paths = resolveTokenPaths(root, []);
+    mkdirSync(join(root, 'src', 'theme'), { recursive: true });
+    writeFileSync(paths.tokensPath, 'old-tokens', 'utf8');
+
+    const code = await runInit({
+      cwd: root,
+      paths,
+      packageName: 'design-token-package',
+      chooseConflict: async () => 'exit',
+    });
+
+    expect(code).toBe(0);
+    expect(readFileSync(paths.tokensPath, 'utf8')).toBe('old-tokens');
+    expect(existsSync(paths.cssPath)).toBe(false);
   });
 });
 
-describe("init", () => {
-  it("scaffolds without @theme when Tailwind is absent", async () => {
-    const root = makeTempProject({
-      withSrc: true,
-      stylesheets: ["src/app/globals.css"],
-    });
+describe('runBuild', () => {
+  it('writes css from tokens.css()', async () => {
+    const root = tempRoot();
+    roots.push(root);
+    mkdirSync(join(root, 'theme'), { recursive: true });
+    const tokensPath = join(root, 'theme', 'tokens.ts');
+    const cssPath = join(root, 'theme', 'tokens.css');
 
-    await runInit({ yes: true, cwd: root });
-
-    expect(existsSync(join(root, "src/theme/tokens.ts"))).toBe(true);
-    expect(existsSync(join(root, "src/theme/tokens.css"))).toBe(true);
-    expect(existsSync(join(root, "design-tokens.config.ts"))).toBe(false);
-    expect(readFileSync(join(root, "src/app/globals.css"), "utf8")).toContain(
-      '@import "../theme/tokens.css";',
-    );
-    const css = readFileSync(join(root, "src/theme/tokens.css"), "utf8");
-    expect(css).toContain(`AUTO-GENERATED BY ${PACKAGE_NAME}`);
-    expect(css).toContain(":root{");
-    expect(css).not.toContain("@theme");
-  });
-
-  it("enables @theme and writes config for Tailwind v4 with -y", async () => {
-    const root = makeTempProject({
-      withSrc: true,
-      stylesheets: ["src/app/globals.css"],
-      packageJson: {
-        dependencies: { next: "^15.0.0", react: "^19.0.0" },
-        devDependencies: { tailwindcss: "^4.1.0" },
-      },
-    });
-
-    await runInit({ yes: true, cwd: root });
-
-    expect(existsSync(join(root, "design-tokens.config.ts"))).toBe(true);
-    expect(readFileSync(join(root, "design-tokens.config.ts"), "utf8")).toContain(
-      "tailwindTheme: true",
-    );
-    const css = readFileSync(join(root, "src/theme/tokens.css"), "utf8");
-    expect(css).toContain("@theme inline");
-    expect(css).toContain("--color-background: var(--background);");
-    expect(css).toContain("--radius-lg: var(--radius);");
-  });
-
-  it("does not overwrite existing tokens.ts", async () => {
-    const root = makeTempProject({ withSrc: true });
-    const tokensPath = join(root, "src/theme/tokens.ts");
-    mkdirSync(dirname(tokensPath), { recursive: true });
-    const marker =
-      "// keep-me\nexport const tokens = { css: () => ':root{}' };\n";
-    writeFileSync(tokensPath, marker, "utf8");
-
-    await runInit({ yes: true, cwd: root });
-
-    expect(readFileSync(tokensPath, "utf8")).toBe(marker);
-  });
-
-  it("keeps existing config on re-init with -y", async () => {
-    const root = makeTempProject({
-      withSrc: true,
-      stylesheets: ["src/app/globals.css"],
-      packageJson: {
-        devDependencies: { tailwindcss: "^4.0.0" },
-      },
-    });
-
-    const original = `export default {
-  tokens: {
-    file: "src/theme/tokens.ts",
-    export: "tokens",
-  },
-  output: {
-    css: "src/theme/tokens.css",
-    tailwindTheme: true,
+    writeFileSync(
+      tokensPath,
+      `export const tokens = {
+  css() {
+    return ":root{--primary:red}.dark{--primary:white}";
   },
 };
-`;
-    writeFileSync(join(root, "design-tokens.config.ts"), original, "utf8");
-    mkdirSync(join(root, "src/theme"), { recursive: true });
-    writeFileSync(
-      join(root, "src/theme/tokens.ts"),
-      `import { defineTokens } from "${PACKAGE_NAME}";
-export const tokens = defineTokens({
-  defaultTheme: "light",
-  themes: {
-    light: { selector: ":root", tokens: { brand: "blue" } },
-  },
-});
 `,
-      "utf8",
+      'utf8',
     );
 
-    await runInit({ yes: true, cwd: root });
-
-    expect(readFileSync(join(root, "design-tokens.config.ts"), "utf8")).toBe(
-      original,
-    );
-    expect(readFileSync(join(root, "src/theme/tokens.css"), "utf8")).toContain(
-      "@theme inline",
-    );
-  });
-
-  it("writes config for custom paths and build reads it", async () => {
-    const root = makeTempProject({ withSrc: true });
-    const customTokens = join(root, "src/design-system/theme.ts");
-    mkdirSync(dirname(customTokens), { recursive: true });
-    writeFileSync(
-      customTokens,
-      `import { defineTokens } from "${PACKAGE_NAME}";
-export const theme = defineTokens({
-  defaultTheme: "light",
-  themes: {
-    light: { selector: ":root", tokens: { accent: "red" } },
-  },
-});
-`,
-      "utf8",
-    );
-
-    const config = {
-      tokens: { file: "./src/design-system/theme.ts", export: "theme" },
-      output: { css: "./src/design-system/variables.css" },
-    };
-    writeConfigFile(root, config);
-    expect(isConventionConfig(root, config)).toBe(false);
-
-    const { outputPath } = await runBuild(root);
-    expect(outputPath).toBe(join(root, "src/design-system/variables.css"));
-    expect(readFileSync(outputPath, "utf8")).toContain("--accent:red");
-    expect(readFileSync(customTokens, "utf8")).toContain("export const theme");
-  });
-});
-
-describe("build", () => {
-  it("regenerates CSS without changing tokens.ts", async () => {
-    const root = makeTempProject({ withSrc: true });
-    const tokensPath = join(root, "src/theme/tokens.ts");
-    mkdirSync(dirname(tokensPath), { recursive: true });
-    const source = `import { defineTokens } from "${PACKAGE_NAME}";
-export const tokens = defineTokens({
-  defaultTheme: "light",
-  themes: {
-    light: { selector: ":root", tokens: { brand: "blue" } },
-  },
-});
-`;
-    writeFileSync(tokensPath, source, "utf8");
-    writeFileSync(join(root, "src/theme/tokens.css"), "/* stale */\n", "utf8");
-
-    await runBuild(root);
-
-    expect(readFileSync(tokensPath, "utf8")).toBe(source);
-    const css = readFileSync(join(root, "src/theme/tokens.css"), "utf8");
-    expect(css).toContain("--brand:blue");
-    expect(css).not.toContain("stale");
-    expect(css).not.toContain("@theme");
-  });
-});
-
-describe("config", () => {
-  it("loadConfig falls back to conventions", async () => {
-    const root = makeTempProject({ withSrc: true });
-    const loaded = await loadConfig(root);
-    expect(loaded.tokens.file).toBe("src/theme/tokens.ts");
-    expect(loaded.configPath).toBeNull();
-  });
-
-  it("formatConfigFile includes inject and tailwindTheme when set", () => {
-    const text = formatConfigFile({
-      tokens: { file: "./a.ts", export: "tokens" },
-      output: { css: "./b.css", tailwindTheme: true },
-      inject: { css: "./c.css" },
+    const code = await runBuild({
+      cwd: root,
+      paths: { tokensPath, cssPath },
     });
-    expect(text).toContain('css: "./c.css"');
-    expect(text).toContain("tailwindTheme: true");
+
+    expect(code).toBe(0);
+    expect(readFileSync(cssPath, 'utf8')).toBe(
+      ':root{--primary:red}.dark{--primary:white}\n',
+    );
   });
 
-  it("isConventionConfig is false when tailwindTheme is on", () => {
-    const root = makeTempProject({ withSrc: true });
-    const config = {
-      ...conventionConfig(root),
-      output: { ...conventionConfig(root).output, tailwindTheme: true },
-    };
-    expect(isConventionConfig(root, config)).toBe(false);
+  it('fails when tokens file is missing', async () => {
+    const root = tempRoot();
+    roots.push(root);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const code = await runBuild({
+      cwd: root,
+      paths: {
+        tokensPath: join(root, 'theme', 'tokens.ts'),
+        cssPath: join(root, 'theme', 'tokens.css'),
+      },
+    });
+
+    expect(code).toBe(1);
+    expect(error).toHaveBeenCalled();
+  });
+
+  it('does not touch unrelated files when writing css', async () => {
+    const root = tempRoot();
+    roots.push(root);
+    const themeDir = join(root, 'theme');
+    mkdirSync(themeDir, { recursive: true });
+    const unrelated = join(themeDir, 'keep.txt');
+    writeFileSync(unrelated, 'safe', 'utf8');
+
+    const tokensPath = join(themeDir, 'tokens.ts');
+    const cssPath = join(themeDir, 'tokens.css');
+    writeFileSync(
+      tokensPath,
+      `export const tokens = { css() { return ":root{--x:1}"; } };\n`,
+      'utf8',
+    );
+
+    await runBuild({ cwd: root, paths: { tokensPath, cssPath } });
+
+    expect(readFileSync(unrelated, 'utf8')).toBe('safe');
   });
 });

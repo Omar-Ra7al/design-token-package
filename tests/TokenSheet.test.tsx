@@ -1,36 +1,36 @@
-import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
-import { defineTokens } from "../src/defineTokens";
-import { TokenSheet } from "../src/react/TokenSheet";
+import { render } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { defineTokens } from '../src/defineTokens';
+import { TokenSheet } from '../src/shared/TokenSheet';
 
 const tokens = defineTokens({
-  defaultTheme: "light",
+  defaultTheme: 'light',
   themes: {
     light: {
-      selector: ":root",
+      selector: ':root',
       tokens: {
-        background: "#fafafa",
-        foreground: "#111111",
+        background: '#fafafa',
+        foreground: '#111111',
       },
     },
     dark: {
-      selector: ".dark",
+      selector: '.dark',
       tokens: {
-        background: "#111111",
-        foreground: "#fafafa",
+        background: '#111111',
+        foreground: '#fafafa',
       },
     },
   },
 });
 
-describe("TokenSheet", () => {
-  it("injects a style tag with tokens.css()", () => {
+describe('TokenSheet', () => {
+  it('injects a style tag with tokens.css()', () => {
     const { container } = render(<TokenSheet tokens={tokens} />);
-    const style = container.querySelector("style");
+    const style = container.querySelector('style');
 
     expect(style).not.toBeNull();
     expect(style?.innerHTML).toBe(tokens.css());
-    expect(style?.innerHTML).toContain("--background:#fafafa");
-    expect(style?.innerHTML).toContain(".dark{");
+    expect(style?.innerHTML).toContain('--background:#fafafa');
+    expect(style?.innerHTML).toContain('.dark{');
   });
 });

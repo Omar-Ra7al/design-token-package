@@ -1,66 +1,58 @@
-import { createJiti } from "jiti";
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, relative } from 'node:path';
+import { createJiti } from 'jiti';
+import type { TokenPaths } from './paths';
 
-import { loadConfig, type ResolvedConfig } from "./config";
-import { PACKAGE_BANNER_NAME, writeCssFile } from "./css-output";
-import { resolveFromRoot } from "./paths";
-import {
-  collectTokenKeys,
-  formatTailwindThemeBlock,
-} from "./tailwind-theme";
-
-export type TokensLike = {
-  css: () => string;
-  themes?: Record<string, { tokens?: Record<string, string> }>;
+export type BuildOptions = {
+  cwd: string;
+  paths: TokenPaths;
 };
 
-export async function loadTokensExport(
-  tokensFile: string,
-  exportName: string,
-): Promise<TokensLike> {
-  const jiti = createJiti(import.meta.url);
-  const mod: unknown = await jiti.import(tokensFile);
-
-  if (!mod || typeof mod !== "object") {
-    throw new Error(`Failed to load tokens module: ${tokensFile}`);
-  }
-
-  const record = mod as Record<string, unknown>;
-  const exported = record[exportName];
-
-  if (!exported || typeof exported !== "object") {
-    throw new Error(`Export "${exportName}" not found in ${tokensFile}`);
-  }
-
-  const api = exported as Partial<TokensLike>;
-  if (typeof api.css !== "function") {
-    throw new Error(
-      `Export "${exportName}" in ${tokensFile} does not have a css() method`,
-    );
-  }
-
-  return api as TokensLike;
+function displayPath(cwd: string, absolutePath: string): string {
+  const rel = relative(cwd, absolutePath);
+  return rel.startsWith('..') ? absolutePath : rel || '.';
 }
 
-export async function runBuild(
-  cwd: string = process.cwd(),
-  config?: ResolvedConfig,
-): Promise<{ outputPath: string }> {
-  const resolved = config ?? (await loadConfig(cwd));
-  const tokensFile = resolveFromRoot(resolved.root, resolved.tokens.file);
-  const outputPath = resolveFromRoot(resolved.root, resolved.output.css);
+type TokensExport = {
+  tokens?: {
+    css?: () => string;
+  };
+};
 
-  const tokens = await loadTokensExport(tokensFile, resolved.tokens.export);
-  let themeBlock: string | undefined;
+export async function runBuild(options: BuildOptions): Promise<number> {
+  const { cwd, paths } = options;
 
-  if (resolved.output.tailwindTheme) {
-    const keys = collectTokenKeys(tokens.themes ?? {});
-    themeBlock = formatTailwindThemeBlock(keys);
+  if (!existsSync(paths.tokensPath)) {
+    console.error(`Tokens file not found: ${displayPath(cwd, paths.tokensPath)}`);
+    console.error('Run `npx design-tokens init` first, or pass custom paths.');
+    return 1;
   }
 
-  writeCssFile(outputPath, tokens.css(), {
-    packageName: PACKAGE_BANNER_NAME,
-    themeBlock,
+  const jiti = createJiti(import.meta.url, {
+    interopDefault: true,
   });
 
-  return { outputPath };
+  let mod: TokensExport;
+  try {
+    mod = (await jiti.import(paths.tokensPath)) as TokensExport;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Failed to load tokens file: ${message}`);
+    return 1;
+  }
+
+  const tokens = mod.tokens;
+  if (tokens == null || typeof tokens.css !== 'function') {
+    console.error(
+      `Expected a named export \`tokens\` with a \`.css()\` method from ${displayPath(cwd, paths.tokensPath)}`,
+    );
+    return 1;
+  }
+
+  const css = tokens.css();
+  mkdirSync(dirname(paths.cssPath), { recursive: true });
+  writeFileSync(paths.cssPath, `${css}\n`, 'utf8');
+
+  console.log(`✓ Wrote ${displayPath(cwd, paths.cssPath)}`);
+  return 0;
 }

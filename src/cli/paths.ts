@@ -1,51 +1,40 @@
-import { existsSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
-export const STYLESHEET_CANDIDATES = [
-  "src/app/globals.css",
-  "src/styles/globals.css",
-  "src/index.css",
-  "src/global.css",
-  "src/styles.css",
-  "app/globals.css",
-  "styles/globals.css",
-] as const;
+export type TokenPaths = {
+  tokensPath: string;
+  cssPath: string;
+};
 
-export function findProjectRoot(cwd: string = process.cwd()): string {
-  let dir = resolve(cwd);
+export function defaultThemeDir(cwd: string): string {
+  return existsSync(join(cwd, 'src')) ? join(cwd, 'src', 'theme') : join(cwd, 'theme');
+}
 
-  while (true) {
-    if (existsSync(join(dir, "package.json"))) {
-      return dir;
-    }
-
-    const parent = dirname(dir);
-    if (parent === dir) {
-      return resolve(cwd);
-    }
-    dir = parent;
+export function resolveTokenPaths(cwd: string, args: string[]): TokenPaths {
+  if (args.length === 0) {
+    const dir = defaultThemeDir(cwd);
+    return {
+      tokensPath: join(dir, 'tokens.ts'),
+      cssPath: join(dir, 'tokens.css'),
+    };
   }
-}
 
-export function defaultThemeDir(root: string): string {
-  return existsSync(join(root, "src")) ? "src/theme" : "theme";
-}
+  if (args.length === 2) {
+    const [tokensArg, cssArg] = args;
+    if (tokensArg == null || cssArg == null) {
+      throw new Error('Expected tokens and css paths');
+    }
+    return {
+      tokensPath: resolve(cwd, tokensArg),
+      cssPath: resolve(cwd, cssArg),
+    };
+  }
 
-export function findStylesheetCandidates(root: string): string[] {
-  return STYLESHEET_CANDIDATES.filter((candidate) =>
-    existsSync(join(root, candidate)),
+  throw new Error(
+    'Expected 0 or 2 path arguments: [tokens.ts] [tokens.css]\n' +
+      '  npx design-tokens init\n' +
+      '  npx design-tokens init ./path/to/tokens.ts ./path/to/tokens.css\n' +
+      '  npx design-tokens build\n' +
+      '  npx design-tokens build ./path/to/tokens.ts ./path/to/tokens.css',
   );
-}
-
-/** Relative POSIX-style path from `fromFile` to `toFile` for use in CSS `@import`. */
-export function relativeImportPath(fromFile: string, toFile: string): string {
-  let rel = relative(dirname(fromFile), toFile).split(sep).join("/");
-  if (!rel.startsWith(".")) {
-    rel = `./${rel}`;
-  }
-  return rel;
-}
-
-export function resolveFromRoot(root: string, path: string): string {
-  return resolve(root, path);
 }

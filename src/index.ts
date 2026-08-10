@@ -1,4 +1,5 @@
-export { defineTokens } from "./defineTokens";
+export { defineTokens } from './defineTokens';
+export { injectTokens } from './injectTokens';
 export type {
   DefineTokensConfig,
   OpacityScale,
@@ -6,4 +7,4 @@ export type {
   TokenMap,
   TokenRef,
   TokensApi,
-} from "./types";
+} from './types';

@@ -1,4 +1,4 @@
-import type { ThemeDefinition, TokensApi } from "../types";
+import type { ThemeDefinition, TokensApi } from '../types';
 
 export function TokenSheet<TThemes extends Record<string, ThemeDefinition>>({
   tokens,

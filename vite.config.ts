@@ -52,17 +52,13 @@ export default defineConfig({
       entry: {
         index: resolve(__dirname, 'src/index.ts'),
         'react/index': resolve(__dirname, 'src/react/index.ts'),
+        'next/index': resolve(__dirname, 'src/next/index.ts'),
         'cli/index': resolve(__dirname, 'src/cli/index.ts'),
       },
       formats: ['es'],
     },
     rollupOptions: {
-      external: [
-        'react',
-        'react-dom',
-        'react/jsx-runtime',
-        ...cliExternals,
-      ],
+      external: ['react', 'react-dom', 'react/jsx-runtime', ...cliExternals],
       output: {
         preserveModules: true,
         preserveModulesRoot: 'src',
