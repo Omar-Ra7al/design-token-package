@@ -4,18 +4,17 @@ import { defineTokens } from '../src/defineTokens';
 import { TokenSheet } from '../src/shared/TokenSheet';
 
 const tokens = defineTokens({
-  defaultTheme: 'light',
-  themes: {
-    light: {
-      selector: ':root',
-      tokens: {
-        background: '#fafafa',
-        foreground: '#111111',
-      },
+  selector: 'class',
+  tokens: {
+    color: {
+      background: '#fafafa',
+      foreground: '#111111',
     },
+  },
+  themes: {
+    light: {},
     dark: {
-      selector: '.dark',
-      tokens: {
+      color: {
         background: '#111111',
         foreground: '#fafafa',
       },

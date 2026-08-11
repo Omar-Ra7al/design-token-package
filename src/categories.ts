@@ -1,16 +1,23 @@
 /**
- * The token categories a config may use, mapped to their Tailwind v4 theme
- * namespace.
+ * The token categories a config may use, mapped to the prefix their CSS
+ * variables carry.
  *
  * Config keys are camelCase so they read naturally in TypeScript, while the
- * value is the CSS variable prefix, which keeps the generated stylesheet
- * compatible with Tailwind's `@theme`. Only the four multi-word namespaces
- * differ from their key.
+ * value is the CSS variable prefix. Most categories use their Tailwind v4
+ * theme namespace, so the generated stylesheet lines up with Tailwind's
+ * `@theme`; only the four multi-word namespaces differ from their key.
+ *
+ * `color` and `custom` are deliberately unprefixed, which is the convention
+ * shadcn/ui popularised: `--primary`, `--background`, `--navHeight`. Mapping
+ * colors back into Tailwind's namespace is the consumer's call, e.g.
+ * `@theme inline { --color-primary: var(--primary); }`.
+ *
+ * `custom` is the home for values Tailwind has no namespace for at all.
  *
  * @see https://tailwindcss.com/docs/theme
  */
 export const TOKEN_CATEGORIES = {
-  color: 'color',
+  color: '',
   font: 'font',
   text: 'text',
   fontWeight: 'font-weight',
@@ -30,4 +37,17 @@ export const TOKEN_CATEGORIES = {
   aspect: 'aspect',
   ease: 'ease',
   animate: 'animate',
+  custom: '',
 } as const;
+
+/**
+ * The CSS variable name a token gets, without the leading `--`.
+ *
+ * `fontWeight.bold` → `font-weight-bold`, while the unprefixed categories keep
+ * the bare token name: `color.primary` → `primary`.
+ */
+export function cssVariableName(category: keyof typeof TOKEN_CATEGORIES, name: string): string {
+  const prefix = TOKEN_CATEGORIES[category];
+
+  return prefix === '' ? name : `${prefix}-${name}`;
+}

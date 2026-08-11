@@ -1,4 +1,4 @@
-import { TOKEN_CATEGORIES } from './categories';
+import { cssVariableName } from './categories';
 import type {
   ColorCategory,
   DefineTokensConfig,
@@ -13,12 +13,19 @@ import type {
 /** Only tokens in this category may carry an opacity step. */
 const COLOR_CATEGORY: ColorCategory = 'color';
 
+/** Where a CSS variable came from, so refs can be traced back to a category. */
+type TokenOrigin = { category: TokenCategory; name: string };
+
 function categoriesOf(...sets: TokenSet[]): TokenCategory[] {
   return [...new Set(sets.flatMap((set) => Object.keys(set)))] as TokenCategory[];
 }
 
 /**
  * Builds a complete token set from the base tokens and a theme's overrides.
+ *
+ * This is the theme's effective value map, used by `themes` and `get()`. The
+ * generated CSS stays narrower: it emits only what a theme declares, and lets
+ * the rest inherit from `:root`.
  *
  * Each category is rebuilt as a new object, so themes never alias the base
  * tokens or each other, and a theme may add token names, or whole categories,
@@ -34,17 +41,48 @@ function resolveTokenSet(base: TokenSet, override: ThemeOverride = {}): TokenSet
   return resolved;
 }
 
-/** Names each token after its Tailwind namespace: `fontWeight.bold` → `font-weight-bold`. */
+/** Names each token after its category: `fontWeight.bold` → `font-weight-bold`. */
 function toCssVariables(tokens: TokenSet): Record<string, string> {
   const variables: Record<string, string> = {};
 
   for (const category of categoriesOf(tokens)) {
     for (const [name, value] of Object.entries(tokens[category] ?? {})) {
-      variables[`${TOKEN_CATEGORIES[category]}-${name}`] = value;
+      variables[cssVariableName(category, name)] = value;
     }
   }
 
   return variables;
+}
+
+/**
+ * Indexes every token by the CSS variable it emits, so a ref like `"primary"`
+ * can be traced back to the category it came from.
+ *
+ * Because `color` and `custom` are unprefixed, two categories can end up
+ * claiming one variable. That is a config error rather than something to
+ * resolve silently: the loser would be overwritten in the stylesheet.
+ */
+function indexTokenOrigins(sets: TokenSet[]): Map<string, TokenOrigin> {
+  const origins = new Map<string, TokenOrigin>();
+
+  for (const set of sets) {
+    for (const category of categoriesOf(set)) {
+      for (const name of Object.keys(set[category] ?? {})) {
+        const path = cssVariableName(category, name);
+        const claimed = origins.get(path);
+
+        if (claimed && claimed.category !== category) {
+          throw new Error(
+            `Both "${claimed.category}.${claimed.name}" and "${category}.${name}" compile to "--${path}". Rename one of them.`,
+          );
+        }
+
+        origins.set(path, { category, name });
+      }
+    }
+  }
+
+  return origins;
 }
 
 /** Returns a selector for a theme based on the strategy. */
@@ -73,8 +111,17 @@ function serializeCssVariables(variables: Record<string, string>): string {
     .join(';');
 }
 
-/** Parses a token reference into a path and optional opacity step. */
-function parseTokenRef(ref: string): { path: string; opacity?: number } {
+/**
+ * Parses a token reference into a path and optional opacity step.
+ *
+ * Whether a ref may carry opacity is decided by the category it was declared
+ * under, not by the shape of its name, since an unprefixed `"primary"` says
+ * nothing about being a color on its own.
+ */
+function parseTokenRef(
+  ref: string,
+  origins: Map<string, TokenOrigin>,
+): { path: string; opacity?: number } {
   const match = ref.match(/^(.+)\/(\d+)$/);
   const path = match?.[1];
   const opacityRaw = match?.[2];
@@ -89,9 +136,15 @@ function parseTokenRef(ref: string): { path: string; opacity?: number } {
     throw new Error(`Invalid opacity "${opacityRaw}" in token ref "${ref}"`);
   }
 
-  if (!path.startsWith(`${COLOR_CATEGORY}-`)) {
+  const origin = origins.get(path);
+
+  if (!origin) {
+    throw new Error(`Unknown token "${path}" in token ref "${ref}"`);
+  }
+
+  if (origin.category !== COLOR_CATEGORY) {
     throw new Error(
-      `Opacity is only supported for "${COLOR_CATEGORY}" tokens, because it compiles to color-mix(); "${ref}" is not a color token.`,
+      `Opacity is only supported for "${COLOR_CATEGORY}" tokens, because it compiles to color-mix(); "${ref}" is a "${origin.category}" token.`,
     );
   }
 
@@ -108,8 +161,12 @@ function withOpacity(color: string, opacity: number): string {
  *
  * `tokens` holds the default values; each theme lists only what it changes, and
  * the theme name becomes the selector value for the configured strategy.
- * Categories come from a fixed Tailwind-compatible set, while the token names
- * inside them are yours to choose.
+ * Categories come from a fixed Tailwind-compatible set, plus `custom` for
+ * anything outside it, while the token names inside them are yours to choose.
+ *
+ * `color` and `custom` tokens emit bare CSS variables (`--primary`), so the
+ * output matches what shadcn/ui-style codebases already expect; every other
+ * category keeps its Tailwind namespace (`--spacing-md`).
  *
  * @param config - Selector strategy, base tokens, and theme overrides.
  *
@@ -127,9 +184,9 @@ function withOpacity(color: string, opacity: number): string {
  * });
  *
  * tokens.css();
- * // ":root{--color-primary:#000;--color-background:#fff}
- * //  .light{--color-primary:#000;--color-background:#fff}
- * //  .dark{--color-primary:#fff;--color-background:#000}"
+ * // ":root{--primary:#000;--background:#fff}
+ * //  .light{}
+ * //  .dark{--primary:#fff;--background:#000}"
  * ```
  */
 export function defineTokens<
@@ -142,30 +199,33 @@ export function defineTokens<
   const resolvedThemes = {} as { [K in keyof TThemes]: ResolvedTheme<TTokens, TThemes[K]> };
   const themeVariables: Record<string, Record<string, string>> = {};
 
+  const origins = indexTokenOrigins([tokens, ...themeNames.map((name) => themes[name] ?? {})]);
   const baseVariables = toCssVariables(tokens);
   const rules = [`:root{${serializeCssVariables(baseVariables)}}`];
 
   for (const name of themeNames) {
-    const resolved = resolveTokenSet(tokens, themes[name]);
-    const variables = toCssVariables(resolved);
+    const override = themes[name] ?? {};
+    const resolved = resolveTokenSet(tokens, override);
 
     resolvedThemes[name] = resolved as ResolvedTheme<TTokens, TThemes[ThemeName]>;
-    themeVariables[name] = variables;
-    rules.push(`${selectorFor(selector, name)}{${serializeCssVariables(variables)}}`);
+    themeVariables[name] = toCssVariables(resolved);
+    rules.push(
+      `${selectorFor(selector, name)}{${serializeCssVariables(toCssVariables(override))}}`,
+    );
   }
 
   /**
    * Gets the resolved value of a token in a specific theme.
    *
-   * Token refs join the category namespace and the token name
-   * (`color.primary` → `"color-primary"`). Color tokens also take a
-   * Tailwind-style opacity step, as in `"color-primary/50"`.
+   * A ref is the token's CSS variable name without the `--`: `color.primary` →
+   * `"primary"`, `spacing.md` → `"spacing-md"`. Color tokens also take a
+   * Tailwind-style opacity step, as in `"primary/50"`.
    *
    * @param theme - The theme to read from.
    * @param ref - Token reference, plus an opacity step for color tokens.
    */
   function get(theme: ThemeName, ref: string): string {
-    const { path, opacity } = parseTokenRef(ref);
+    const { path, opacity } = parseTokenRef(ref, origins);
     const value = themeVariables[theme]?.[path];
 
     if (value === undefined) {
@@ -183,24 +243,25 @@ export function defineTokens<
    * tokens.var("spacing-md");
    * // "var(--spacing-md)"
    *
-   * tokens.var("color-primary/50");
-   * // "color-mix(in oklch, var(--color-primary) 50%, transparent)"
+   * tokens.var("primary/50");
+   * // "color-mix(in oklch, var(--primary) 50%, transparent)"
    * ```
    */
   function cssVar(ref: string): string {
-    const { path, opacity } = parseTokenRef(ref);
+    const { path, opacity } = parseTokenRef(ref, origins);
     const variable = `var(--${path})`;
 
     return opacity == null ? variable : withOpacity(variable, opacity);
   }
 
   /**
-   * Generates the stylesheet: the base tokens on `:root`, then one complete
-   * rule per theme.
+   * Generates the stylesheet: the base tokens on `:root`, then one rule per
+   * theme holding only the tokens that theme declares.
    *
-   * The `:root` rule keeps every token defined when no theme selector is
-   * active, and comes first so the theme rules override it. Each theme rule
-   * carries the full token set, so switching selectors swaps the whole theme.
+   * The `:root` rule comes first, so it defines every base token and the theme
+   * rules override it. Anything a theme leaves out is not repeated; it inherits
+   * from `:root` instead, which keeps the output small and means a theme that
+   * only styles colors never restates unrelated categories like spacing.
    */
   function css(): string {
     return rules.join('');
