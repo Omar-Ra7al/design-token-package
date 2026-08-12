@@ -154,4 +154,41 @@ describe('defineTokens', () => {
       /Invalid selector/,
     );
   });
+
+  it('theme() is empty unless generateThemeInline is on', () => {
+    expect(sample.theme()).toBe('');
+
+    const withTailwind = defineTokens({
+      selector: 'class',
+      tailwind: { generateThemeInline: true },
+      tokens: {
+        color: { primary: '#000', background: '#fff' },
+        spacing: { md: '16px' },
+        custom: { navHeight: '4rem' },
+      },
+      themes: {
+        dark: {
+          color: { primary: '#fff', seafoam: 'oklch(0.88 0.08 175)' },
+          radius: { md: '0.5rem' },
+        },
+      },
+    });
+
+    expect(withTailwind.css()).not.toContain('@theme');
+    expect(withTailwind.theme()).toBe(
+      '@theme inline{--color-background:var(--background);--color-primary:var(--primary);--color-seafoam:var(--seafoam);--radius-md:var(--radius-md);--spacing-md:var(--spacing-md)}',
+    );
+    expect(withTailwind.theme()).not.toContain('navHeight');
+  });
+
+  it('theme() is empty when enabled but only custom tokens exist', () => {
+    const customOnly = defineTokens({
+      selector: 'class',
+      tailwind: { generateThemeInline: true },
+      tokens: { custom: { navHeight: '4rem' } },
+      themes: { light: {} },
+    });
+
+    expect(customOnly.theme()).toBe('');
+  });
 });

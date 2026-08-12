@@ -8,11 +8,9 @@
  * `@theme`; only the four multi-word namespaces differ from their key.
  *
  * `color` and `custom` are deliberately unprefixed, which is the convention
- * shadcn/ui popularised: `--primary`, `--background`, `--navHeight`. Mapping
- * colors back into Tailwind's namespace is the consumer's call, e.g.
- * `@theme inline { --color-primary: var(--primary); }`.
- *
- * `custom` is the home for values Tailwind has no namespace for at all.
+ * shadcn/ui popularised: `--primary`, `--background`, `--navHeight`. Colors are
+ * remapped into Tailwind via `theme()` (`--color-primary: var(--primary)`);
+ * other categories are registered in place. `custom` has no Tailwind namespace.
  *
  * @see https://tailwindcss.com/docs/theme
  */

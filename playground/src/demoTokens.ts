@@ -8,7 +8,9 @@ import { defineTokens } from '../../src/defineTokens';
  */
 export const tokens = defineTokens({
   selector: 'class',
-
+  tailwind: {
+    generateThemeInline: true,
+  },
   tokens: {
     color: {
       background: 'oklch(1 0 0)',

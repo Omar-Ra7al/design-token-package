@@ -72,10 +72,23 @@ describe('buildConflictOptions', () => {
       'overwrite',
       'exit',
     ]);
-    expect(buildConflictOptions(false).map((o) => o.value)).toEqual([
-      'overwrite',
-      'exit',
-    ]);
+    expect(buildConflictOptions(false).map((o) => o.value)).toEqual(['overwrite', 'exit']);
+  });
+});
+
+describe('tokensScaffold', () => {
+  it('omits the tailwind block by default', () => {
+    const scaffold = tokensScaffold('design-token-package');
+    expect(scaffold).not.toContain('generateThemeInline');
+    expect(scaffold).not.toContain('tailwind:');
+  });
+
+  it('includes generateThemeInline when requested', () => {
+    const scaffold = tokensScaffold('design-token-package', {
+      generateThemeInline: true,
+    });
+    expect(scaffold).toContain('tailwind: {');
+    expect(scaffold).toContain('generateThemeInline: true');
   });
 });
 
@@ -89,14 +102,32 @@ describe('runInit', () => {
       cwd: root,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      chooseTailwind: async () => false,
+      choosePathMode: async () => 'defaults',
+    });
+
+    expect(code).toBe(0);
+    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(tokensScaffold('design-token-package'));
+    expect(readFileSync(paths.cssPath, 'utf8')).toBe(emptyCssStub());
+  });
+
+  it('scaffolds generateThemeInline when Tailwind is selected', async () => {
+    const root = tempRoot();
+    mkdirSync(join(root, 'src'));
+    const paths = defaultTokenPaths(root);
+
+    const code = await runInit({
+      cwd: root,
+      packageName: 'design-token-package',
+      chooseUsage: async () => 'css',
+      chooseTailwind: async () => true,
       choosePathMode: async () => 'defaults',
     });
 
     expect(code).toBe(0);
     expect(readFileSync(paths.tokensPath, 'utf8')).toBe(
-      tokensScaffold('design-token-package'),
+      tokensScaffold('design-token-package', { generateThemeInline: true }),
     );
-    expect(readFileSync(paths.cssPath, 'utf8')).toBe(emptyCssStub());
   });
 
   it('react mode with defaults creates tokens only', async () => {
@@ -108,13 +139,12 @@ describe('runInit', () => {
       cwd: root,
       packageName: 'design-token-package',
       chooseUsage: async () => 'react',
+      chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
     });
 
     expect(code).toBe(0);
-    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(
-      tokensScaffold('design-token-package'),
-    );
+    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(tokensScaffold('design-token-package'));
     expect(existsSync(paths.cssPath)).toBe(false);
   });
 
@@ -127,6 +157,7 @@ describe('runInit', () => {
       cwd: root,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      chooseTailwind: async () => false,
       choosePathMode: async () => 'custom',
       chooseCustomPaths: async () => ({ tokensPath, cssPath }),
     });
@@ -145,6 +176,7 @@ describe('runInit', () => {
       cwd: root,
       packageName: 'design-token-package',
       chooseUsage: async () => 'react',
+      chooseTailwind: async () => false,
       choosePathMode: async () => 'custom',
       chooseCustomPaths: async () => ({ tokensPath, cssPath }),
     });
@@ -164,6 +196,7 @@ describe('runInit', () => {
       cwd: root,
       packageName: 'design-token-package',
       chooseUsage: async () => 'react',
+      chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
     });
 
@@ -182,6 +215,7 @@ describe('runInit', () => {
       cwd: root,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
     });
 
@@ -199,6 +233,7 @@ describe('runInit', () => {
       cwd: root,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
       chooseConflict: async (ctx) => {
         expect(ctx.hasMissing).toBe(true);
@@ -223,6 +258,7 @@ describe('runInit', () => {
       cwd: root,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
       chooseConflict: async (ctx) => {
         expect(ctx.hasMissing).toBe(false);
@@ -247,14 +283,13 @@ describe('runInit', () => {
       cwd: root,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
       chooseConflict: async () => 'overwrite',
     });
 
     expect(code).toBe(0);
-    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(
-      tokensScaffold('design-token-package'),
-    );
+    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(tokensScaffold('design-token-package'));
     expect(readFileSync(paths.cssPath, 'utf8')).toBe(emptyCssStub());
   });
 
@@ -269,6 +304,7 @@ describe('runInit', () => {
       cwd: root,
       packageName: 'design-token-package',
       chooseUsage: async () => 'css',
+      chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
       chooseConflict: async () => 'exit',
     });
@@ -308,6 +344,36 @@ describe('runBuild', () => {
     expect(written).toContain('npx design-tokens build');
     expect(written).toContain('npx design-tokens build theme/tokens.ts theme/tokens.css');
     expect(written).toContain(':root{--primary:red}.dark{--primary:white}');
+  });
+
+  it('appends theme() after css() when present', async () => {
+    const root = tempRoot();
+    mkdirSync(join(root, 'theme'), { recursive: true });
+    const tokensPath = join(root, 'theme', 'tokens.ts');
+    const cssPath = join(root, 'theme', 'tokens.css');
+
+    writeFileSync(
+      tokensPath,
+      `export const tokens = {
+  css() {
+    return ":root{--primary:red}";
+  },
+  theme() {
+    return "@theme inline{--color-primary:var(--primary)}";
+  },
+};
+`,
+      'utf8',
+    );
+
+    const code = await runBuild({
+      cwd: root,
+      paths: { tokensPath, cssPath },
+    });
+
+    expect(code).toBe(0);
+    const written = readFileSync(cssPath, 'utf8');
+    expect(written).toContain(':root{--primary:red}@theme inline{--color-primary:var(--primary)}');
   });
 
   it('fails when tokens file is missing', async () => {

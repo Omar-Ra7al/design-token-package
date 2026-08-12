@@ -1,9 +1,23 @@
-export function tokensScaffold(packageName: string): string {
+export type TokensScaffoldOptions = {
+  generateThemeInline?: boolean;
+};
+
+export function tokensScaffold(packageName: string, options: TokensScaffoldOptions = {}): string {
+  const generateThemeInline = options.generateThemeInline === true;
+
+  const tailwindBlock = generateThemeInline
+    ? `
+  tailwind: {
+    generateThemeInline: true,
+  },
+`
+    : '';
+
   return `import { defineTokens } from "${packageName}";
 
 export const tokens = defineTokens({
   selector: "class",
-
+${tailwindBlock}
   tokens: {
     color: {
       background: "oklch(1 0 0)",

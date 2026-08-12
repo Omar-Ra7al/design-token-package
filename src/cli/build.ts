@@ -31,6 +31,7 @@ export function buildCssBanner(cwd: string, paths: TokenPaths): string {
 type TokensExport = {
   tokens?: {
     css?: () => string;
+    theme?: () => string;
   };
 };
 
@@ -64,7 +65,8 @@ export async function runBuild(options: BuildOptions): Promise<number> {
     return 1;
   }
 
-  const css = `${buildCssBanner(cwd, paths)}${tokens.css()}\n`;
+  const themeCss = typeof tokens.theme === 'function' ? tokens.theme() : '';
+  const css = `${buildCssBanner(cwd, paths)}${tokens.css()}${themeCss}\n`;
   mkdirSync(dirname(paths.cssPath), { recursive: true });
   writeFileSync(paths.cssPath, css, 'utf8');
 

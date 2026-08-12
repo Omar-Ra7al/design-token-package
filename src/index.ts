@@ -9,6 +9,7 @@ export type {
   OpacityScale,
   ResolvedTheme,
   SelectorStrategy,
+  TailwindConfig,
   ThemeOverride,
   TokenCategory,
   TokenCssSource,

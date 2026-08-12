@@ -39,11 +39,29 @@ type ExactCategories<TTokens> = { [K in Exclude<keyof TTokens, TokenCategory>]: 
  */
 export type SelectorStrategy = 'class' | 'id' | `data-${string}`;
 
+/**
+ * Optional Tailwind integration for `defineTokens`.
+ *
+ * Today this only controls whether `theme()` emits an `@theme inline` bridge
+ * that registers tokens with Tailwind (colors remapped into `--color-*`,
+ * other categories registered under their existing prefixes).
+ */
+export type TailwindConfig = {
+  /**
+   * When `true`, `theme()` returns an `@theme inline` block so Tailwind
+   * utilities resolve against your CSS variables. Leave unset or `false` to
+   * skip the bridge.
+   */
+  generateThemeInline?: boolean;
+};
+
 export type DefineTokensConfig<
   TTokens extends TokenSet,
   TThemes extends Record<string, ThemeOverride>,
 > = {
   selector: SelectorStrategy;
+  /** Tailwind helpers; omit when you are not on Tailwind v4. */
+  tailwind?: TailwindConfig;
   tokens: TTokens & ExactCategories<TTokens>;
   themes: TThemes & { [K in keyof TThemes]: ThemeOverride & ExactCategories<TThemes[K]> };
 };
@@ -142,6 +160,12 @@ export type TokensApi<TTokens extends TokenSet, TThemes extends Record<string, T
   ): string;
 
   css(): string;
+
+  /**
+   * Tailwind v4 `@theme inline` bridge, or `""` when
+   * `tailwind.generateThemeInline` is off / there is nothing to register.
+   */
+  theme(): string;
 };
 
 /** Minimal surface needed to render or inject the generated token CSS. */

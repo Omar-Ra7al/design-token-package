@@ -3,9 +3,10 @@
 Typed TypeScript design tokens that compile to CSS custom properties per theme. The **core** API works with any JS/TS stack; an optional **React** entry injects the stylesheet.
 
 ```
-defineTokens({ selector, tokens, themes })
-    → TokensApi { get, var, css, themes, themeNames }
+defineTokens({ selector, tokens, themes, tailwind? })
+    → TokensApi { get, var, css, theme, themes, themeNames }
     → tokens.css() anywhere, or <TokenSheet tokens={…} /> in React
+    → tokens.theme() for Tailwind @theme inline (when enabled)
     → selector-based theme switching (.dark, #dark, [data-theme="dark"]) on <html>
 ```
 
@@ -29,9 +30,10 @@ npx design-tokens build
 `init` walks you through steps (no path arguments):
 
 1. **How will you use your tokens?** — CSS file, or React / Next.js
-2. **Where should we put files?** — defaults, or custom paths
-3. **Custom paths** (if chosen) — tokens file; CSS file only in CSS mode (suggested beside the tokens file)
-4. **Conflicts** — create missing / overwrite / exit when relevant files already exist
+2. **Are you using Tailwind CSS v4?** — Yes scaffolds `tailwind: { generateThemeInline: true }`
+3. **Where should we put files?** — defaults, or custom paths
+4. **Custom paths** (if chosen) — tokens file; CSS file only in CSS mode (suggested beside the tokens file)
+5. **Conflicts** — create missing / overwrite / exit when relevant files already exist
 
 Defaults:
 
@@ -138,14 +140,21 @@ tokens.var('navHeight'); // "var(--navHeight)"
 tokens.var('spacing-md'); // "var(--spacing-md)"
 ```
 
-Because colors are unprefixed, mapping them into Tailwind's color namespace is the consumer's call:
+Because colors are unprefixed, map them into Tailwind's `--color-*` namespace for utilities like `bg-primary`. Prefer the built-in bridge:
 
-```css
-@theme inline {
-  --color-primary: var(--primary);
-  --color-background: var(--background);
-}
+```ts
+defineTokens({
+  selector: 'class',
+  tailwind: { generateThemeInline: true },
+  tokens: { color: { primary: 'oklch(0% 0 0)' } },
+  themes: { dark: { color: { primary: 'oklch(1 0 0)' } } },
+});
+
+tokens.theme();
+// "@theme inline{--color-primary:var(--primary);--spacing-md:var(--spacing-md)}"
 ```
+
+`css()` never includes `@theme` — that keeps `TokenSheet` / runtime injection free of Tailwind directives. `npx design-tokens build` appends `theme()` after `css()` when the flag is on. Import the generated file **after** `@import "tailwindcss"`.
 
 Two categories can't claim the same variable. `color.primary` alongside `custom.primary` throws at `defineTokens()` rather than letting one silently overwrite the other in the stylesheet.
 
@@ -267,11 +276,11 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 
 ### Core (`@Omar-Ra7al/design-token-package`)
 
-| Export             | Role                                                                                                                                                                                                                                               |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `defineTokens`     | Factory → `TokensApi`                                                                                                                                                                                                                              |
-| `TOKEN_CATEGORIES` | The allowed categories mapped to their CSS variable prefix                                                                                                                                                                                         |
-| Types              | `DefineTokensConfig`, `SelectorStrategy`, `TokenCategory`, `CategoryPrefix`, `TokenGroup`, `TokenSet`, `ThemeOverride`, `ResolvedTheme`, `TokenPath`, `TokenRef`, `ColorCategory`, `ColorTokenPath`, `TokensApi`, `TokenCssSource`, `OpacityScale` |
+| Export             | Role                                                                                                                                                                                                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `defineTokens`     | Factory → `TokensApi`                                                                                                                                                                                                                                                |
+| `TOKEN_CATEGORIES` | The allowed categories mapped to their CSS variable prefix                                                                                                                                                                                                           |
+| Types              | `DefineTokensConfig`, `TailwindConfig`, `SelectorStrategy`, `TokenCategory`, `CategoryPrefix`, `TokenGroup`, `TokenSet`, `ThemeOverride`, `ResolvedTheme`, `TokenPath`, `TokenRef`, `ColorCategory`, `ColorTokenPath`, `TokensApi`, `TokenCssSource`, `OpacityScale` |
 
 ### React (`@Omar-Ra7al/design-token-package/react`)
 
@@ -287,13 +296,14 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 
 ### `TokensApi`
 
-| Member            | Purpose                                                            |
-| ----------------- | ------------------------------------------------------------------ |
-| `themes`          | Base tokens with each theme's overrides applied                    |
-| `themeNames`      | Theme name list (handy for theme switchers)                        |
-| `get(theme, ref)` | Resolved literal for a named theme                                 |
-| `var(ref)`        | `var(--key)` or opacity `color-mix(...)` — tracks the active theme |
-| `css()`           | Full stylesheet: all base tokens on `:root`, then each theme's own |
+| Member            | Purpose                                                                 |
+| ----------------- | ----------------------------------------------------------------------- |
+| `themes`          | Base tokens with each theme's overrides applied                         |
+| `themeNames`      | Theme name list (handy for theme switchers)                             |
+| `get(theme, ref)` | Resolved literal for a named theme                                      |
+| `var(ref)`        | `var(--key)` or opacity `color-mix(...)` — tracks the active theme      |
+| `css()`           | Stylesheet: base tokens on `:root`, then each theme's own (no `@theme`) |
+| `theme()`         | `@theme inline` bridge when `tailwind.generateThemeInline` is on        |
 
 ### Opacity refs
 
@@ -334,17 +344,27 @@ Each public entry exposes `types` then `import` in `package.json` `exports`, so 
 
 ## Consuming in CSS / Tailwind
 
-Non-color categories already match Tailwind v4's namespaces. Colors are bare, so map them into the `color` namespace to get utilities like `bg-primary`:
+Non-color categories already match Tailwind v4's namespaces. For bare colors, enable the bridge:
 
-```css
-@theme inline {
-  --color-background: var(--background);
-  --color-primary: var(--primary);
-  --radius-md: var(--radius-md);
+```ts
+tailwind: {
+  generateThemeInline: true;
 }
 ```
 
-Or use raw vars:
+Then either:
+
+- run `npx design-tokens build` and import the CSS file after `@import "tailwindcss"`, or
+- paste `tokens.theme()` into a CSS file Tailwind compiles
+
+```css
+@import 'tailwindcss';
+@import './theme/tokens.css'; /* contains :root/.dark + @theme inline when enabled */
+```
+
+`tokens.theme()` registers every Tailwind category: colors as `--color-*: var(--*)`, and spacing/radius/font/etc. as identity maps (`--spacing-md: var(--spacing-md)`). `custom` is omitted — it has no Tailwind namespace.
+
+Or use raw vars without Tailwind utilities:
 
 ```tsx
 style={{ background: tokens.var("background") }}

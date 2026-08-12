@@ -24,6 +24,8 @@ export type InitOptions = {
   /** Injected for tests; defaults to clack select. */
   chooseUsage?: () => Promise<UsageMode | 'exit'>;
   /** Injected for tests; defaults to clack select. */
+  chooseTailwind?: () => Promise<boolean | 'exit'>;
+  /** Injected for tests; defaults to clack select. */
   choosePathMode?: (defaultsLabel: string) => Promise<PathMode | 'exit'>;
   /** Injected for tests; defaults to clack text prompts. */
   chooseCustomPaths?: (usage: UsageMode) => Promise<TokenPaths | 'exit'>;
@@ -62,6 +64,23 @@ async function defaultChooseUsage(): Promise<UsageMode | 'exit'> {
     options: [
       { value: 'css' as const, label: 'CSS file' },
       { value: 'react' as const, label: 'React / Next.js' },
+    ],
+  });
+
+  if (p.isCancel(choice)) {
+    p.cancel('Cancelled.');
+    return 'exit';
+  }
+
+  return choice;
+}
+
+async function defaultChooseTailwind(): Promise<boolean | 'exit'> {
+  const choice = await p.select({
+    message: 'Are you using Tailwind CSS v4?',
+    options: [
+      { value: true, label: 'Yes' },
+      { value: false, label: 'No' },
     ],
   });
 
@@ -161,6 +180,7 @@ function printGuide(
   created: string[],
   mode: UsageMode,
   packageName: string,
+  generateThemeInline: boolean,
 ): void {
   for (const file of created) {
     console.log(`✓ Created ${displayPath(cwd, file)}`);
@@ -174,23 +194,34 @@ function printGuide(
   const tokensDisplay = displayPath(cwd, paths.tokensPath);
 
   if (mode === 'react') {
+    const tailwindHint = generateThemeInline
+      ? `
+  3. For Tailwind utilities, put tokens.theme() in a CSS file Tailwind compiles
+     (after @import "tailwindcss"), or run: npx design-tokens build
+`
+      : '';
+
     console.log(`
 Next:
   1. Define your tokens in ${tokensDisplay}
   2. Mount <TokenSheet tokens={tokens} /> from ${packageName}/react
-     (or ${packageName}/next in App Router)
-`);
+     (or ${packageName}/next in App Router)${tailwindHint}`);
     return;
   }
 
   const cssDisplay = displayPath(cwd, paths.cssPath);
+  const importHint = generateThemeInline
+    ? `
+  3. Import ${cssDisplay} in your Tailwind entry AFTER @import "tailwindcss"
+`
+    : `
+  3. Import ${cssDisplay} into your global stylesheet
+`;
 
   console.log(`
 Next:
   1. Define your tokens in ${tokensDisplay}
-  2. Run: npx design-tokens build
-  3. Import ${cssDisplay} into your global stylesheet
-
+  2. Run: npx design-tokens build${importHint}
 Custom paths:
   npx design-tokens build ./path/to/tokens.ts ./path/to/tokens.css
 `);
@@ -199,6 +230,7 @@ Custom paths:
 export async function runInit(options: InitOptions): Promise<number> {
   const { cwd, packageName } = options;
   const chooseUsage = options.chooseUsage ?? defaultChooseUsage;
+  const chooseTailwind = options.chooseTailwind ?? defaultChooseTailwind;
   const choosePathMode = options.choosePathMode ?? defaultChoosePathMode;
   const chooseCustomPaths =
     options.chooseCustomPaths ?? ((usage: UsageMode) => defaultChooseCustomPaths(cwd, usage));
@@ -208,6 +240,12 @@ export async function runInit(options: InitOptions): Promise<number> {
   if (usage === 'exit') {
     return 0;
   }
+
+  const tailwindChoice = await chooseTailwind();
+  if (tailwindChoice === 'exit') {
+    return 0;
+  }
+  const generateThemeInline = tailwindChoice;
 
   const defaults = defaultTokenPaths(cwd);
   const defaultsLabel =
@@ -263,7 +301,7 @@ export async function runInit(options: InitOptions): Promise<number> {
 
   if (writeTokens) {
     ensureParentDir(paths.tokensPath);
-    writeFileSync(paths.tokensPath, tokensScaffold(packageName), 'utf8');
+    writeFileSync(paths.tokensPath, tokensScaffold(packageName, { generateThemeInline }), 'utf8');
     created.push(paths.tokensPath);
   }
 
@@ -273,6 +311,6 @@ export async function runInit(options: InitOptions): Promise<number> {
     created.push(paths.cssPath);
   }
 
-  printGuide(cwd, paths, created, usage, packageName);
+  printGuide(cwd, paths, created, usage, packageName, generateThemeInline);
   return 0;
 }

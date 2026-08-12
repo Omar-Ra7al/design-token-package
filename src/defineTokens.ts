@@ -168,12 +168,16 @@ function withOpacity(color: string, opacity: number): string {
  * output matches what shadcn/ui-style codebases already expect; every other
  * category keeps its Tailwind namespace (`--spacing-md`).
  *
- * @param config - Selector strategy, base tokens, and theme overrides.
+ * Set `tailwind.generateThemeInline` to emit a separate `@theme inline` bridge
+ * via `theme()`, so bare colors map into Tailwind utilities (`bg-primary`).
+ *
+ * @param config - Selector strategy, optional Tailwind options, base tokens, and theme overrides.
  *
  * @example
  * ```ts
  * const tokens = defineTokens({
  *   selector: "class",
+ *   tailwind: { generateThemeInline: true },
  *   tokens: {
  *     color: { primary: "#000", background: "#fff" },
  *   },
@@ -187,14 +191,24 @@ function withOpacity(color: string, opacity: number): string {
  * // ":root{--primary:#000;--background:#fff}
  * //  .light{}
  * //  .dark{--primary:#fff;--background:#000}"
+ *
+ * tokens.theme();
+ * // "@theme inline{--color-background:var(--background);--color-primary:var(--primary)}"
+ * // (+ --spacing-*, --radius-*, … when those categories are present; never custom)
  * ```
  */
 export function defineTokens<
   TTokens extends TokenSet,
   TThemes extends Record<string, ThemeOverride>,
->({ selector, tokens, themes }: DefineTokensConfig<TTokens, TThemes>): TokensApi<TTokens, TThemes> {
+>({
+  selector,
+  tailwind,
+  tokens,
+  themes,
+}: DefineTokensConfig<TTokens, TThemes>): TokensApi<TTokens, TThemes> {
   type ThemeName = keyof TThemes & string;
 
+  const generateThemeInline = tailwind?.generateThemeInline === true;
   const themeNames = Object.keys(themes) as ThemeName[];
   const resolvedThemes = {} as { [K in keyof TThemes]: ResolvedTheme<TTokens, TThemes[K]> };
   const themeVariables: Record<string, Record<string, string>> = {};
@@ -213,6 +227,14 @@ export function defineTokens<
       `${selectorFor(selector, name)}{${serializeCssVariables(toCssVariables(override))}}`,
     );
   }
+
+  const themeInlineEntries = [...origins.entries()]
+    .filter(([, origin]) => origin.category !== 'custom')
+    .map(([path, origin]) => {
+      const themeName = origin.category === COLOR_CATEGORY ? `color-${path}` : path;
+      return `--${themeName}:var(--${path})`;
+    })
+    .sort();
 
   /**
    * Gets the resolved value of a token in a specific theme.
@@ -262,9 +284,31 @@ export function defineTokens<
    * rules override it. Anything a theme leaves out is not repeated; it inherits
    * from `:root` instead, which keeps the output small and means a theme that
    * only styles colors never restates unrelated categories like spacing.
+   *
+   * Never includes `@theme` — use `theme()` for the Tailwind bridge.
    */
   function css(): string {
     return rules.join('');
+  }
+
+  /**
+   * Tailwind v4 `@theme inline` bridge so utilities pick up your tokens.
+   *
+   * Only runs when `tailwind.generateThemeInline` is `true`. Colors are remapped
+   * into Tailwind's color namespace (`--color-primary: var(--primary)`); every
+   * other Tailwind category is registered in place
+   * (`--spacing-md: var(--spacing-md)`). `custom` is skipped — it has no
+   * Tailwind namespace.
+   *
+   * Put this in a CSS file Tailwind compiles (after `@import "tailwindcss"`).
+   * Do not inject it at runtime via `TokenSheet` — Tailwind never sees it there.
+   */
+  function theme(): string {
+    if (!generateThemeInline || themeInlineEntries.length === 0) {
+      return '';
+    }
+
+    return `@theme inline{${themeInlineEntries.join(';')}}`;
   }
 
   return {
@@ -273,5 +317,6 @@ export function defineTokens<
     get,
     var: cssVar,
     css,
+    theme,
   };
 }
