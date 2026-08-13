@@ -1,6 +1,6 @@
 {
   "name": "design-token-package",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "Theme token system package",
   "license": "MIT",
   "type": "module",
