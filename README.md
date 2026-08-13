@@ -154,7 +154,7 @@ tokens.theme();
 // "@theme inline{--color-primary:var(--primary);--spacing-md:var(--spacing-md)}"
 ```
 
-`css()` never includes `@theme` — that keeps `TokenSheet` / runtime injection free of Tailwind directives. `npx design-tokens build` appends `theme()` after `css()` when the flag is on. Import the generated file **after** `@import "tailwindcss"`. If you previously wrote your own `@theme inline`, remove it — the generated output includes a comment reminding you of that.
+`css()` never includes `@theme` — that keeps `TokenSheet` / runtime injection free of Tailwind directives. `npx design-tokens build` appends `theme()` after `css()` when the flag is on, and the file header reminds you to remove any hand-written `@theme inline`. Import the generated file **after** `@import "tailwindcss"`.
 
 Two categories can't claim the same variable. `color.primary` alongside `custom.primary` throws at `defineTokens()` rather than letting one silently overwrite the other in the stylesheet.
 

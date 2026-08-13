@@ -191,10 +191,7 @@ describe('defineTokens', () => {
     });
 
     expect(withTailwind.css()).not.toContain('@theme');
-    expect(withTailwind.theme()).toContain(
-      'If you already have a hand-written @theme inline { ... } in your CSS',
-    );
-    expect(withTailwind.theme()).toContain(
+    expect(withTailwind.theme()).toBe(
       '@theme inline{--color-background:var(--background);--color-primary:var(--primary);--color-seafoam:var(--seafoam);--radius-md:var(--radius-md);--spacing-md:var(--spacing-md)}',
     );
     expect(withTailwind.theme()).not.toContain('navHeight');
