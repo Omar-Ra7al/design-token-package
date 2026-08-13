@@ -8,6 +8,7 @@ import { defineTokens } from '../../src/defineTokens';
  */
 export const tokens = defineTokens({
   selector: 'class',
+  defaultTheme: 'light',
   tailwind: {
     generateThemeInline: true,
   },
@@ -57,8 +58,6 @@ export const tokens = defineTokens({
   },
 
   themes: {
-    light: {},
-
     dark: {
       color: {
         background: 'oklch(0% 0 0)',

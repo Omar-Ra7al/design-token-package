@@ -2,7 +2,6 @@ import { cssVariableName } from './categories';
 import type {
   ColorCategory,
   DefineTokensConfig,
-  ResolvedTheme,
   SelectorStrategy,
   ThemeOverride,
   TokenCategory,
@@ -159,8 +158,9 @@ function withOpacity(color: string, opacity: number): string {
 /**
  * Creates a type-safe design token system from base tokens and theme overrides.
  *
- * `tokens` holds the default values; each theme lists only what it changes, and
- * the theme name becomes the selector value for the configured strategy.
+ * `tokens` holds the default theme's values (named by `defaultTheme` and emitted
+ * on `:root`). Each entry in `themes` lists only what that theme changes; its
+ * key becomes the selector value for the configured strategy.
  * Categories come from a fixed Tailwind-compatible set, plus `custom` for
  * anything outside it, while the token names inside them are yours to choose.
  *
@@ -171,26 +171,27 @@ function withOpacity(color: string, opacity: number): string {
  * Set `tailwind.generateThemeInline` to emit a separate `@theme inline` bridge
  * via `theme()`, so bare colors map into Tailwind utilities (`bg-primary`).
  *
- * @param config - Selector strategy, optional Tailwind options, base tokens, and theme overrides.
+ * @param config - Selector, default theme name, optional Tailwind options, base tokens, and overrides.
  *
  * @example
  * ```ts
  * const tokens = defineTokens({
  *   selector: "class",
+ *   defaultTheme: "light",
  *   tailwind: { generateThemeInline: true },
  *   tokens: {
  *     color: { primary: "#000", background: "#fff" },
  *   },
  *   themes: {
- *     light: {},
  *     dark: { color: { primary: "#fff", background: "#000" } },
  *   },
  * });
  *
  * tokens.css();
  * // ":root{--primary:#000;--background:#fff}
- * //  .light{}
  * //  .dark{--primary:#fff;--background:#000}"
+ *
+ * tokens.get("light", "primary"); // "#000"
  *
  * tokens.theme();
  * // "@theme inline{--color-background:var(--background);--color-primary:var(--primary)}"
@@ -200,28 +201,53 @@ function withOpacity(color: string, opacity: number): string {
 export function defineTokens<
   TTokens extends TokenSet,
   TThemes extends Record<string, ThemeOverride>,
+  TDefault extends string,
 >({
   selector,
+  defaultTheme,
   tailwind,
   tokens,
   themes,
-}: DefineTokensConfig<TTokens, TThemes>): TokensApi<TTokens, TThemes> {
-  type ThemeName = keyof TThemes & string;
+}: DefineTokensConfig<TTokens, TThemes, TDefault>): TokensApi<TTokens, TThemes, TDefault> {
+  if (Object.prototype.hasOwnProperty.call(themes, defaultTheme)) {
+    throw new Error(
+      `defaultTheme "${defaultTheme}" must not also appear in themes. Remove it from themes — the base tokens are that theme.`,
+    );
+  }
+
+  type OverrideName = keyof TThemes & string;
 
   const generateThemeInline = tailwind?.generateThemeInline === true;
-  const themeNames = Object.keys(themes) as ThemeName[];
-  const resolvedThemes = {} as { [K in keyof TThemes]: ResolvedTheme<TTokens, TThemes[K]> };
+  const overrideNames = Object.keys(themes) as OverrideName[];
+  const themeNames = [defaultTheme, ...overrideNames] as TokensApi<
+    TTokens,
+    TThemes,
+    TDefault
+  >['themeNames'];
+
+  const resolvedThemes = {} as TokensApi<TTokens, TThemes, TDefault>['themes'];
   const themeVariables: Record<string, Record<string, string>> = {};
 
-  const origins = indexTokenOrigins([tokens, ...themeNames.map((name) => themes[name] ?? {})]);
+  const origins = indexTokenOrigins([tokens, ...overrideNames.map((name) => themes[name] ?? {})]);
   const baseVariables = toCssVariables(tokens);
   const rules = [`:root{${serializeCssVariables(baseVariables)}}`];
 
-  for (const name of themeNames) {
+  resolvedThemes[defaultTheme] = tokens as unknown as TokensApi<
+    TTokens,
+    TThemes,
+    TDefault
+  >['themes'][TDefault];
+  themeVariables[defaultTheme] = baseVariables;
+
+  for (const name of overrideNames) {
     const override = themes[name] ?? {};
     const resolved = resolveTokenSet(tokens, override);
 
-    resolvedThemes[name] = resolved as ResolvedTheme<TTokens, TThemes[ThemeName]>;
+    resolvedThemes[name] = resolved as TokensApi<
+      TTokens,
+      TThemes,
+      TDefault
+    >['themes'][OverrideName];
     themeVariables[name] = toCssVariables(resolved);
     rules.push(
       `${selectorFor(selector, name)}{${serializeCssVariables(toCssVariables(override))}}`,
@@ -243,10 +269,10 @@ export function defineTokens<
    * `"primary"`, `spacing.md` → `"spacing-md"`. Color tokens also take a
    * Tailwind-style opacity step, as in `"primary/50"`.
    *
-   * @param theme - The theme to read from.
+   * @param theme - The theme to read from (including `defaultTheme`).
    * @param ref - Token reference, plus an opacity step for color tokens.
    */
-  function get(theme: ThemeName, ref: string): string {
+  function get(theme: string, ref: string): string {
     const { path, opacity } = parseTokenRef(ref, origins);
     const value = themeVariables[theme]?.[path];
 
@@ -277,13 +303,12 @@ export function defineTokens<
   }
 
   /**
-   * Generates the stylesheet: the base tokens on `:root`, then one rule per
-   * theme holding only the tokens that theme declares.
+   * Generates the stylesheet: the base (default) tokens on `:root`, then one
+   * rule per override theme holding only the tokens that theme declares.
    *
-   * The `:root` rule comes first, so it defines every base token and the theme
-   * rules override it. Anything a theme leaves out is not repeated; it inherits
-   * from `:root` instead, which keeps the output small and means a theme that
-   * only styles colors never restates unrelated categories like spacing.
+   * The `:root` rule comes first and is the default theme's values — there is
+   * no empty selector rule for `defaultTheme`. Override rules then change what
+   * they need; anything they leave out inherits from `:root`.
    *
    * Never includes `@theme` — use `theme()` for the Tailwind bridge.
    */
@@ -300,6 +325,9 @@ export function defineTokens<
    * (`--spacing-md: var(--spacing-md)`). `custom` is skipped — it has no
    * Tailwind namespace.
    *
+   * Prefixed with a short comment reminding consumers to drop any hand-written
+   * `@theme inline` so theme variables are not defined twice.
+   *
    * Put this in a CSS file Tailwind compiles (after `@import "tailwindcss"`).
    * Do not inject it at runtime via `TokenSheet` — Tailwind never sees it there.
    */
@@ -308,7 +336,14 @@ export function defineTokens<
       return '';
     }
 
-    return `@theme inline{${themeInlineEntries.join(';')}}`;
+    const notice = `/*
+ * @theme inline below is generated by design-tokens.
+ * If you already have a hand-written @theme inline { ... } in your CSS,
+ * remove it — keeping both will redefine the same theme variables.
+ */
+`;
+
+    return `${notice}@theme inline{${themeInlineEntries.join(';')}}`;
   }
 
   return {

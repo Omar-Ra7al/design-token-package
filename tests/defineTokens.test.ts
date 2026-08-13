@@ -3,6 +3,7 @@ import { defineTokens } from '../src/defineTokens';
 
 const sample = defineTokens({
   selector: 'class',
+  defaultTheme: 'light',
 
   tokens: {
     color: {
@@ -21,8 +22,6 @@ const sample = defineTokens({
   },
 
   themes: {
-    light: {},
-
     dark: {
       color: {
         background: '#000000',
@@ -49,7 +48,7 @@ function ruleFor(css: string, selector: string): string {
 }
 
 describe('defineTokens', () => {
-  it('exposes theme metadata with base tokens applied', () => {
+  it('exposes the default theme like any other theme', () => {
     expect(sample.themeNames).toEqual(['light', 'dark', 'ocean']);
     expect(sample.themes.light.color.primary).toBe('oklch(0% 0 0)');
     expect(sample.themes.ocean.spacing.lg).toBe('24px');
@@ -78,11 +77,13 @@ describe('defineTokens', () => {
     expect(ocean).not.toContain('--background');
   });
 
-  it('emits an empty rule for a theme that changes nothing', () => {
-    expect(sample.css()).toContain('.light{}');
+  it('does not emit a selector rule for the default theme', () => {
+    expect(sample.css()).not.toContain('.light{');
+    expect(sample.css()).toContain(':root{');
   });
 
   it('resolves get() from the theme, falling back to base tokens', () => {
+    expect(sample.get('light', 'primary')).toBe('oklch(0% 0 0)');
     expect(sample.get('dark', 'background')).toBe('#000000');
     expect(sample.get('ocean', 'background')).toBe('#ffffff');
     expect(sample.get('ocean', 'spacing-lg')).toBe('24px');
@@ -122,10 +123,22 @@ describe('defineTokens', () => {
     );
   });
 
+  it('throws when defaultTheme also appears in themes', () => {
+    expect(() =>
+      defineTokens({
+        selector: 'class',
+        defaultTheme: 'light',
+        tokens: { color: { primary: '#000' } },
+        themes: { light: {}, dark: {} },
+      } as never),
+    ).toThrow(/defaultTheme "light" must not also appear in themes/);
+  });
+
   it('throws when two categories claim the same variable', () => {
     expect(() =>
       defineTokens({
         selector: 'class',
+        defaultTheme: 'light',
         tokens: { color: { primary: '#000' }, custom: { primary: '4rem' } },
         themes: { dark: {} },
       }),
@@ -134,6 +147,7 @@ describe('defineTokens', () => {
     expect(() =>
       defineTokens({
         selector: 'class',
+        defaultTheme: 'light',
         tokens: { spacing: { md: '16px' } },
         themes: { dark: { custom: { 'spacing-md': '20px' } } },
       }),
@@ -142,9 +156,10 @@ describe('defineTokens', () => {
 
   it('supports id and data-* selector strategies', () => {
     const config = {
+      defaultTheme: 'light' as const,
       tokens: { color: { primary: '#000' } },
       themes: { dark: { color: { primary: '#fff' } } },
-    } as const;
+    };
 
     expect(defineTokens({ selector: 'id', ...config }).css()).toContain('#dark{--primary:#fff}');
     expect(defineTokens({ selector: 'data-theme', ...config }).css()).toContain(
@@ -160,6 +175,7 @@ describe('defineTokens', () => {
 
     const withTailwind = defineTokens({
       selector: 'class',
+      defaultTheme: 'light',
       tailwind: { generateThemeInline: true },
       tokens: {
         color: { primary: '#000', background: '#fff' },
@@ -175,7 +191,10 @@ describe('defineTokens', () => {
     });
 
     expect(withTailwind.css()).not.toContain('@theme');
-    expect(withTailwind.theme()).toBe(
+    expect(withTailwind.theme()).toContain(
+      'If you already have a hand-written @theme inline { ... } in your CSS',
+    );
+    expect(withTailwind.theme()).toContain(
       '@theme inline{--color-background:var(--background);--color-primary:var(--primary);--color-seafoam:var(--seafoam);--radius-md:var(--radius-md);--spacing-md:var(--spacing-md)}',
     );
     expect(withTailwind.theme()).not.toContain('navHeight');
@@ -184,9 +203,10 @@ describe('defineTokens', () => {
   it('theme() is empty when enabled but only custom tokens exist', () => {
     const customOnly = defineTokens({
       selector: 'class',
+      defaultTheme: 'light',
       tailwind: { generateThemeInline: true },
       tokens: { custom: { navHeight: '4rem' } },
-      themes: { light: {} },
+      themes: { dark: {} },
     });
 
     expect(customOnly.theme()).toBe('');

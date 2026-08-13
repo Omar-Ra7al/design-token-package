@@ -58,12 +58,26 @@ export type TailwindConfig = {
 export type DefineTokensConfig<
   TTokens extends TokenSet,
   TThemes extends Record<string, ThemeOverride>,
+  TDefault extends string,
 > = {
   selector: SelectorStrategy;
+  /**
+   * Name of the base theme (the `tokens` values on `:root`).
+   *
+   * Used by `themeNames`, `themes`, and `get()`. Must not also appear as a key
+   * in `themes`.
+   */
+  defaultTheme: TDefault;
   /** Tailwind helpers; omit when you are not on Tailwind v4. */
   tailwind?: TailwindConfig;
   tokens: TTokens & ExactCategories<TTokens>;
-  themes: TThemes & { [K in keyof TThemes]: ThemeOverride & ExactCategories<TThemes[K]> };
+  themes: TThemes & {
+    [K in keyof TThemes]: ThemeOverride & ExactCategories<TThemes[K]>;
+  } & (TDefault extends keyof TThemes
+      ? {
+          [K in TDefault]: never;
+        }
+      : unknown);
 };
 
 /** Base tokens with a theme's overrides applied, keeping both sets of names. */
@@ -71,6 +85,9 @@ export type ResolvedTheme<TTokens, TOverride> = {
   [K in keyof TTokens | keyof TOverride]: (K extends keyof TTokens ? TTokens[K] : unknown) &
     (K extends keyof TOverride ? TOverride[K] : unknown);
 };
+
+/** Every theme name the API exposes: the default plus each override. */
+export type ThemeName<TThemes, TDefault extends string> = TDefault | (keyof TThemes & string);
 
 /** A token's CSS variable name, skipping the separator for unprefixed categories. */
 type PrefixedName<TPrefix extends string, TName extends string> = TPrefix extends ''
@@ -139,16 +156,25 @@ export type OpacityScale =
 export type TokenRef<TPath extends string, TColorName extends string = never> =
   TPath | `${TColorName}/${OpacityScale}`;
 
-export type TokensApi<TTokens extends TokenSet, TThemes extends Record<string, ThemeOverride>> = {
-  /** Base tokens with each theme's overrides applied. */
-  themes: { [K in keyof TThemes]: ResolvedTheme<TTokens, TThemes[K]> };
-  themeNames: (keyof TThemes & string)[];
+export type TokensApi<
+  TTokens extends TokenSet,
+  TThemes extends Record<string, ThemeOverride>,
+  TDefault extends string,
+> = {
+  /** Base tokens with each theme's overrides applied (default = base `tokens`). */
+  themes: {
+    [K in ThemeName<TThemes, TDefault>]: K extends keyof TThemes
+      ? ResolvedTheme<TTokens, TThemes[K]>
+      : TTokens;
+  };
+  themeNames: ThemeName<TThemes, TDefault>[];
 
-  get<TTheme extends keyof TThemes & string>(
+  get<TTheme extends ThemeName<TThemes, TDefault>>(
     theme: TTheme,
     ref: TokenRef<
-      TokenPath<TTokens> | TokenPath<TThemes[TTheme]>,
-      ColorTokenPath<TTokens> | ColorTokenPath<TThemes[TTheme]>
+      TokenPath<TTokens> | (TTheme extends keyof TThemes ? TokenPath<TThemes[TTheme]> : never),
+      | ColorTokenPath<TTokens>
+      | (TTheme extends keyof TThemes ? ColorTokenPath<TThemes[TTheme]> : never)
     >,
   ): string;
 

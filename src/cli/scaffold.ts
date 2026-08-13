@@ -17,6 +17,7 @@ export function tokensScaffold(packageName: string, options: TokensScaffoldOptio
 
 export const tokens = defineTokens({
   selector: "class",
+  defaultTheme: "light", // Base tokens live on :root; this name is for get() / theme switchers
 ${tailwindBlock}
   tokens: {
     color: {
@@ -31,8 +32,6 @@ ${tailwindBlock}
   },
 
   themes: {
-    light: {},
-
     dark: {
       color: {
         background: "oklch(0% 0 0)",

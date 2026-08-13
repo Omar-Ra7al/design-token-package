@@ -3,7 +3,7 @@
 Typed TypeScript design tokens that compile to CSS custom properties per theme. The **core** API works with any JS/TS stack; an optional **React** entry injects the stylesheet.
 
 ```
-defineTokens({ selector, tokens, themes, tailwind? })
+defineTokens({ selector, defaultTheme, tokens, themes, tailwind? })
     → TokensApi { get, var, css, theme, themes, themeNames }
     → tokens.css() anywhere, or <TokenSheet tokens={…} /> in React
     → tokens.theme() for Tailwind @theme inline (when enabled)
@@ -79,6 +79,7 @@ import type { TokensApi, TokenRef } from '@Omar-Ra7al/design-token-package';
 
 export const tokens = defineTokens({
   selector: 'class',
+  defaultTheme: 'light', // Base tokens live on :root; this name is for get() / theme switchers
 
   tokens: {
     color: {
@@ -93,8 +94,6 @@ export const tokens = defineTokens({
   },
 
   themes: {
-    light: {},
-
     dark: {
       color: {
         background: 'oklch(0% 0 0)',
@@ -145,6 +144,7 @@ Because colors are unprefixed, map them into Tailwind's `--color-*` namespace fo
 ```ts
 defineTokens({
   selector: 'class',
+  defaultTheme: 'light',
   tailwind: { generateThemeInline: true },
   tokens: { color: { primary: 'oklch(0% 0 0)' } },
   themes: { dark: { color: { primary: 'oklch(1 0 0)' } } },
@@ -154,7 +154,7 @@ tokens.theme();
 // "@theme inline{--color-primary:var(--primary);--spacing-md:var(--spacing-md)}"
 ```
 
-`css()` never includes `@theme` — that keeps `TokenSheet` / runtime injection free of Tailwind directives. `npx design-tokens build` appends `theme()` after `css()` when the flag is on. Import the generated file **after** `@import "tailwindcss"`.
+`css()` never includes `@theme` — that keeps `TokenSheet` / runtime injection free of Tailwind directives. `npx design-tokens build` appends `theme()` after `css()` when the flag is on. Import the generated file **after** `@import "tailwindcss"`. If you previously wrote your own `@theme inline`, remove it — the generated output includes a comment reminding you of that.
 
 Two categories can't claim the same variable. `color.primary` alongside `custom.primary` throws at `defineTokens()` rather than letting one silently overwrite the other in the stylesheet.
 
@@ -182,15 +182,15 @@ Custom tokens work like every other category: themes can override them, and `get
 
 ### Base tokens and themes
 
-`tokens` holds the default values. A theme lists only what it changes, and everything else inherits from `:root`:
+`defaultTheme` is **required**. It names the base `tokens` set (emitted on `:root`) so it shows up in `themeNames`, `themes`, and `get()` like any other theme. Do **not** put that name in `themes` — that is a type error and throws at runtime.
 
 ```ts
+defaultTheme: 'light',
 tokens: {
   color: { background: 'oklch(1 0 0)', primary: 'oklch(0% 0 0)' },
   radius: { md: '0.625rem' },
 },
 themes: {
-  light: {},
   dark: { color: { background: 'oklch(0% 0 0)', primary: 'oklch(1 0 0)' } },
 },
 ```
@@ -201,29 +201,27 @@ themes: {
   --primary: oklch(0% 0 0);
   --radius-md: 0.625rem;
 }
-.light {
-}
 .dark {
   --background: oklch(0% 0 0);
   --primary: oklch(1 0 0);
 }
 ```
 
-The base tokens are emitted on `:root` first, so every token has a value even before a theme class is applied. A theme rule then carries **only the tokens that theme declares** — a theme with just colors never restates your spacing, and a theme that changes nothing is an empty rule. Everything it omits inherits from `:root`, so swapping the selector on `<html>` still swaps the whole theme.
-
-`tokens.themes` and `get()` are unaffected: they report each theme's effective values, base tokens included.
+There is no empty `.light{}` rule — the default theme is `:root`. Override themes list only what they change; everything else inherits from `:root`.
 
 ```ts
+tokens.themeNames; // ["light", "dark"]
+tokens.get('light', 'primary'); // from base tokens
 tokens.get('dark', 'radius-md'); // "0.625rem", inherited from the base tokens
 ```
 
-The theme name is the selector value:
+Override theme names become the selector value:
 
-| `selector`     | Generated rules                                    |
-| -------------- | -------------------------------------------------- |
-| `'class'`      | `.light{…}` `.dark{…}`                             |
-| `'id'`         | `#light{…}` `#dark{…}`                             |
-| `'data-theme'` | `[data-theme="light"]{…}` `[data-theme="dark"]{…}` |
+| `selector`     | Generated rules (overrides only) |
+| -------------- | -------------------------------- |
+| `'class'`      | `.dark{…}`                       |
+| `'id'`         | `#dark{…}`                       |
+| `'data-theme'` | `[data-theme="dark"]{…}`         |
 
 A theme gets the full category list whether or not the base defined it, and token names stay open, so a theme can add its own:
 
@@ -298,8 +296,8 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 
 | Member            | Purpose                                                                 |
 | ----------------- | ----------------------------------------------------------------------- |
-| `themes`          | Base tokens with each theme's overrides applied                         |
-| `themeNames`      | Theme name list (handy for theme switchers)                             |
+| `themes`          | Default + override themes with base tokens applied                      |
+| `themeNames`      | `[defaultTheme, …overrides]` (handy for theme switchers)                |
 | `get(theme, ref)` | Resolved literal for a named theme                                      |
 | `var(ref)`        | `var(--key)` or opacity `color-mix(...)` — tracks the active theme      |
 | `css()`           | Stylesheet: base tokens on `:root`, then each theme's own (no `@theme`) |
