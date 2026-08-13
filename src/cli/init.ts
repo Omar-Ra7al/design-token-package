@@ -10,7 +10,7 @@ import {
   type TokenPaths,
 } from './paths';
 
-export type UsageMode = 'css' | 'react';
+export type UsageMode = 'css' | 'tokens';
 export type PathMode = 'defaults' | 'custom';
 export type ConflictChoice = 'create-missing' | 'overwrite' | 'exit';
 
@@ -60,10 +60,10 @@ function ensureParentDir(filePath: string): void {
 
 async function defaultChooseUsage(): Promise<UsageMode | 'exit'> {
   const choice = await p.select({
-    message: 'How will you use your tokens?',
+    message: 'What should we create?',
     options: [
-      { value: 'css' as const, label: 'CSS file' },
-      { value: 'react' as const, label: 'React / Next.js' },
+      { value: 'css' as const, label: 'Tokens + CSS file' },
+      { value: 'tokens' as const, label: 'Tokens file only' },
     ],
   });
 
@@ -132,7 +132,7 @@ async function defaultChooseCustomPaths(
 
   const tokensPath = resolvePathArg(cwd, tokensInput);
 
-  if (usage === 'react') {
+  if (usage === 'tokens') {
     return {
       tokensPath,
       cssPath: suggestCssPath(tokensPath),
@@ -193,7 +193,7 @@ function printGuide(
 
   const tokensDisplay = displayPath(cwd, paths.tokensPath);
 
-  if (mode === 'react') {
+  if (mode === 'tokens') {
     const tailwindHint = generateThemeInline
       ? `
   3. For Tailwind utilities, put tokens.theme() in a CSS file Tailwind compiles
@@ -204,8 +204,10 @@ function printGuide(
     console.log(`
 Next:
   1. Define your tokens in ${tokensDisplay}
-  2. Mount <TokenSheet tokens={tokens} /> from ${packageName}/react
-     (or ${packageName}/next in App Router)${tailwindHint}`);
+  2. Use the tokens API in code, for example:
+     tokens.get('light', 'primary')     // any JS runtime, including Expo / React Native
+     injectTokens(tokens)               // browser
+     <TokenSheet tokens={tokens} />     // React / Next on web (${packageName}/react or /next)${tailwindHint}`);
     return;
   }
 

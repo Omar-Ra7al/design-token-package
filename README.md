@@ -29,7 +29,7 @@ npx design-tokens build
 
 `init` walks you through steps (no path arguments):
 
-1. **How will you use your tokens?** — CSS file, or React / Next.js
+1. **What should we create?** — Tokens + CSS file, or Tokens file only
 2. **Are you using Tailwind CSS v4?** — Yes scaffolds `tailwind: { generateThemeInline: true }`
 3. **Where should we put files?** — defaults, or custom paths
 4. **Custom paths** (if chosen) — tokens file; CSS file only in CSS mode (suggested beside the tokens file)
@@ -40,8 +40,8 @@ Defaults:
 - If `src/` exists → `src/theme/tokens.ts` (+ `tokens.css` in CSS mode)
 - Otherwise → `theme/tokens.ts` (+ `tokens.css` in CSS mode)
 
-- **CSS file** — creates `tokens.ts` + an empty `tokens.css` stub; later run `build` and import the CSS
-- **React / Next.js** — creates `tokens.ts` only; mount `<TokenSheet />` from `/react` or `/next` (no CSS file)
+- **Tokens + CSS file** — creates `tokens.ts` + an empty `tokens.css` stub; later run `build` and import the CSS
+- **Tokens file only** — creates `tokens.ts` only; use the tokens API in code (no CSS file)
 
 `build` still accepts optional paths:
 
@@ -65,6 +65,19 @@ Next:
 
 Custom paths:
   npx design-tokens build ./path/to/tokens.ts ./path/to/tokens.css
+```
+
+After a successful tokens-only init:
+
+```text
+✓ Created src/theme/tokens.ts
+
+Next:
+  1. Define your tokens in src/theme/tokens.ts
+  2. Use the tokens API in code, for example:
+     tokens.get('light', 'primary')     // any JS runtime, including Expo / React Native
+     injectTokens(tokens)               // browser
+     <TokenSheet tokens={tokens} />     // React / Next on web
 ```
 
 The initial CSS file is a comment stub. Real CSS comes from `build`, which calls your exported `tokens.css()`.
@@ -277,6 +290,7 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 | Export             | Role                                                                                                                                                                                                                                                                 |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `defineTokens`     | Factory → `TokensApi`                                                                                                                                                                                                                                                |
+| `injectTokens`     | Injects `tokens.css()` into a `<style>` tag in the document head (browser; no-op when `document` is unavailable)                                                                                                                                                     |
 | `TOKEN_CATEGORIES` | The allowed categories mapped to their CSS variable prefix                                                                                                                                                                                                           |
 | Types              | `DefineTokensConfig`, `TailwindConfig`, `SelectorStrategy`, `TokenCategory`, `CategoryPrefix`, `TokenGroup`, `TokenSet`, `ThemeOverride`, `ResolvedTheme`, `TokenPath`, `TokenRef`, `ColorCategory`, `ColorTokenPath`, `TokensApi`, `TokenCssSource`, `OpacityScale` |
 

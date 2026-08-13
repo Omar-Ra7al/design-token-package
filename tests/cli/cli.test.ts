@@ -130,7 +130,7 @@ describe('runInit', () => {
     );
   });
 
-  it('react mode with defaults creates tokens only', async () => {
+  it('tokens mode with defaults creates tokens only', async () => {
     const root = tempRoot();
     mkdirSync(join(root, 'src'));
     const paths = defaultTokenPaths(root);
@@ -138,7 +138,7 @@ describe('runInit', () => {
     const code = await runInit({
       cwd: root,
       packageName: 'design-token-package',
-      chooseUsage: async () => 'react',
+      chooseUsage: async () => 'tokens',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
     });
@@ -167,7 +167,7 @@ describe('runInit', () => {
     expect(readFileSync(cssPath, 'utf8')).toBe(emptyCssStub());
   });
 
-  it('custom react paths only create tokens', async () => {
+  it('custom tokens paths only create tokens', async () => {
     const root = tempRoot();
     const tokensPath = join(root, 'src', 'design-system', 'theme.ts');
     const cssPath = join(root, 'src', 'design-system', 'theme.css');
@@ -175,7 +175,7 @@ describe('runInit', () => {
     const code = await runInit({
       cwd: root,
       packageName: 'design-token-package',
-      chooseUsage: async () => 'react',
+      chooseUsage: async () => 'tokens',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'custom',
       chooseCustomPaths: async () => ({ tokensPath, cssPath }),
@@ -186,7 +186,7 @@ describe('runInit', () => {
     expect(existsSync(cssPath)).toBe(false);
   });
 
-  it('react mode leaves existing css untouched', async () => {
+  it('tokens mode leaves existing css untouched', async () => {
     const root = tempRoot();
     mkdirSync(join(root, 'src', 'theme'), { recursive: true });
     const paths = defaultTokenPaths(root);
@@ -195,7 +195,7 @@ describe('runInit', () => {
     await runInit({
       cwd: root,
       packageName: 'design-token-package',
-      chooseUsage: async () => 'react',
+      chooseUsage: async () => 'tokens',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
     });
