@@ -169,7 +169,7 @@ function withOpacity(color: string, opacity: number): string {
  * category keeps its Tailwind namespace (`--spacing-md`).
  *
  * Set `tailwind.generateThemeInline` to emit a separate `@theme inline` bridge
- * via `theme()`, so bare colors map into Tailwind utilities (`bg-primary`).
+ * via `tailwind()`, so bare colors map into Tailwind utilities (`bg-primary`).
  *
  * @param config - Selector, default theme name, optional Tailwind options, base tokens, and overrides.
  *
@@ -193,9 +193,12 @@ function withOpacity(color: string, opacity: number): string {
  *
  * tokens.get("light", "primary"); // "#000"
  *
- * tokens.theme();
+ * tokens.tailwind();
  * // "@theme inline{--color-background:var(--background);--color-primary:var(--primary)}"
  * // (+ --spacing-*, --radius-*, … when those categories are present; never custom)
+ *
+ * tokens.stylesheet();
+ * // tokens.css() + tokens.tailwind()
  * ```
  */
 export function defineTokens<
@@ -205,7 +208,7 @@ export function defineTokens<
 >({
   selector,
   defaultTheme,
-  tailwind,
+  tailwind: tailwindConfig,
   tokens,
   themes,
 }: DefineTokensConfig<TTokens, TThemes, TDefault>): TokensApi<TTokens, TThemes, TDefault> {
@@ -217,7 +220,7 @@ export function defineTokens<
 
   type OverrideName = keyof TThemes & string;
 
-  const generateThemeInline = tailwind?.generateThemeInline === true;
+  const generateThemeInline = tailwindConfig?.generateThemeInline === true;
   const overrideNames = Object.keys(themes) as OverrideName[];
   const themeNames = [defaultTheme, ...overrideNames] as TokensApi<
     TTokens,
@@ -310,7 +313,7 @@ export function defineTokens<
    * no empty selector rule for `defaultTheme`. Override rules then change what
    * they need; anything they leave out inherits from `:root`.
    *
-   * Never includes `@theme` — use `theme()` for the Tailwind bridge.
+   * Never includes `@theme` — use `tailwind()` for the Tailwind bridge.
    */
   function css(): string {
     return rules.join('');
@@ -326,14 +329,23 @@ export function defineTokens<
    * Tailwind namespace.
    *
    * Put this in a CSS file Tailwind compiles (after `@import "tailwindcss"`).
-   * Do not inject it at runtime via `TokenSheet` — Tailwind never sees it there.
+   * `stylesheet()` appends this after `css()`; Tailwind still only sees it in a
+   * compiled stylesheet.
    */
-  function theme(): string {
+  function tailwind(): string {
     if (!generateThemeInline || themeInlineEntries.length === 0) {
       return '';
     }
 
     return `@theme inline{${themeInlineEntries.join(';')}}`;
+  }
+
+  /**
+   * Full stylesheet for injection and `design-tokens build`: `css()`, then
+   * `tailwind()` when that bridge is non-empty.
+   */
+  function stylesheet(): string {
+    return `${css()}${tailwind()}`;
   }
 
   return {
@@ -342,6 +354,7 @@ export function defineTokens<
     get,
     var: cssVar,
     css,
-    theme,
+    tailwind,
+    stylesheet,
   };
 }

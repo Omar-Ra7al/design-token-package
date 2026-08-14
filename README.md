@@ -4,9 +4,9 @@ Typed TypeScript design tokens that compile to CSS custom properties per theme. 
 
 ```
 defineTokens({ selector, defaultTheme, tokens, themes, tailwind? })
-    → TokensApi { get, var, css, theme, themes, themeNames }
-    → tokens.css() anywhere, or <TokenSheet tokens={…} /> in React
-    → tokens.theme() for Tailwind @theme inline (when enabled)
+    → TokensApi { get, var, css, tailwind, stylesheet, themes, themeNames }
+    → tokens.stylesheet() anywhere, or <TokenSheet tokens={…} /> in React
+    → tokens.tailwind() for Tailwind @theme inline (when enabled)
     → selector-based theme switching (.dark, #dark, [data-theme="dark"]) on <html>
 ```
 
@@ -80,7 +80,7 @@ Next:
      <TokenSheet tokens={tokens} />     // React / Next on web
 ```
 
-The initial CSS file is a comment stub. Real CSS comes from `build`, which calls your exported `tokens.css()`.
+The initial CSS file is a comment stub. Real CSS comes from `build`, which writes `tokens.stylesheet()` (`css()` plus `tailwind()` when enabled).
 
 ## Quick start
 
@@ -118,7 +118,7 @@ export const tokens = defineTokens({
 });
 
 // Inject however your stack prefers, e.g. a <style> tag or a CSS file:
-// document.head.insertAdjacentHTML("beforeend", `<style>${tokens.css()}</style>`);
+// document.head.insertAdjacentHTML("beforeend", `<style>${tokens.stylesheet()}</style>`);
 ```
 
 ### Token categories
@@ -163,11 +163,11 @@ defineTokens({
   themes: { dark: { color: { primary: 'oklch(1 0 0)' } } },
 });
 
-tokens.theme();
+tokens.tailwind();
 // "@theme inline{--color-primary:var(--primary);--spacing-md:var(--spacing-md)}"
 ```
 
-`css()` never includes `@theme` — that keeps `TokenSheet` / runtime injection free of Tailwind directives. `npx design-tokens build` appends `theme()` after `css()` when the flag is on, and the file header reminds you to remove any hand-written `@theme inline`. Import the generated file **after** `@import "tailwindcss"`.
+`css()` never includes `@theme`. `stylesheet()` is `css()` plus `tailwind()` when the flag is on — that is what `TokenSheet`, `injectTokens`, and `npx design-tokens build` emit. The generated file header reminds you to remove any hand-written `@theme inline`. Import the generated file **after** `@import "tailwindcss"` so Tailwind utilities actually pick up the bridge.
 
 Two categories can't claim the same variable. `color.primary` alongside `custom.primary` throws at `defineTokens()` rather than letting one silently overwrite the other in the stylesheet.
 
@@ -290,7 +290,7 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 | Export             | Role                                                                                                                                                                                                                                                                 |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `defineTokens`     | Factory → `TokensApi`                                                                                                                                                                                                                                                |
-| `injectTokens`     | Injects `tokens.css()` into a `<style>` tag in the document head (browser; no-op when `document` is unavailable)                                                                                                                                                     |
+| `injectTokens`     | Injects `tokens.stylesheet()` into a `<style>` tag in the document head (browser; no-op when `document` is unavailable) |
 | `TOKEN_CATEGORIES` | The allowed categories mapped to their CSS variable prefix                                                                                                                                                                                                           |
 | Types              | `DefineTokensConfig`, `TailwindConfig`, `SelectorStrategy`, `TokenCategory`, `CategoryPrefix`, `TokenGroup`, `TokenSet`, `ThemeOverride`, `ResolvedTheme`, `TokenPath`, `TokenRef`, `ColorCategory`, `ColorTokenPath`, `TokensApi`, `TokenCssSource`, `OpacityScale` |
 
@@ -298,7 +298,7 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 
 | Export       | Role                                        |
 | ------------ | ------------------------------------------- |
-| `TokenSheet` | React component that injects `tokens.css()` |
+| `TokenSheet` | React component that injects `tokens.stylesheet()` |
 
 ### Next.js (`@Omar-Ra7al/design-token-package/next`)
 
@@ -315,7 +315,8 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 | `get(theme, ref)` | Resolved literal for a named theme                                      |
 | `var(ref)`        | `var(--key)` or opacity `color-mix(...)` — tracks the active theme      |
 | `css()`           | Stylesheet: base tokens on `:root`, then each theme's own (no `@theme`) |
-| `theme()`         | `@theme inline` bridge when `tailwind.generateThemeInline` is on        |
+| `tailwind()`      | `@theme inline` bridge when `tailwind.generateThemeInline` is on        |
+| `stylesheet()`    | `css()` plus `tailwind()` — what `TokenSheet` / `injectTokens` / `build` emit |
 
 ### Opacity refs
 
@@ -367,14 +368,14 @@ tailwind: {
 Then either:
 
 - run `npx design-tokens build` and import the CSS file after `@import "tailwindcss"`, or
-- paste `tokens.theme()` into a CSS file Tailwind compiles
+- paste `tokens.tailwind()` into a CSS file Tailwind compiles
 
 ```css
 @import 'tailwindcss';
 @import './theme/tokens.css'; /* contains :root/.dark + @theme inline when enabled */
 ```
 
-`tokens.theme()` registers every Tailwind category: colors as `--color-*: var(--*)`, and spacing/radius/font/etc. as identity maps (`--spacing-md: var(--spacing-md)`). `custom` is omitted — it has no Tailwind namespace.
+`tokens.tailwind()` registers every Tailwind category: colors as `--color-*: var(--*)`, and spacing/radius/font/etc. as identity maps (`--spacing-md: var(--spacing-md)`). `custom` is omitted — it has no Tailwind namespace.
 
 Or use raw vars without Tailwind utilities:
 

@@ -42,13 +42,13 @@ export type SelectorStrategy = 'class' | 'id' | `data-${string}`;
 /**
  * Optional Tailwind integration for `defineTokens`.
  *
- * Today this only controls whether `theme()` emits an `@theme inline` bridge
+ * Today this only controls whether `tailwind()` emits an `@theme inline` bridge
  * that registers tokens with Tailwind (colors remapped into `--color-*`,
  * other categories registered under their existing prefixes).
  */
 export type TailwindConfig = {
   /**
-   * When `true`, `theme()` returns an `@theme inline` block so Tailwind
+   * When `true`, `tailwind()` returns an `@theme inline` block so Tailwind
    * utilities resolve against your CSS variables. Leave unset or `false` to
    * skip the bridge.
    */
@@ -191,8 +191,13 @@ export type TokensApi<
    * Tailwind v4 `@theme inline` bridge, or `""` when
    * `tailwind.generateThemeInline` is off / there is nothing to register.
    */
-  theme(): string;
+  tailwind(): string;
+
+  /**
+   * Full stylesheet: `css()` plus `tailwind()` when the bridge is non-empty.
+   */
+  stylesheet(): string;
 };
 
 /** Minimal surface needed to render or inject the generated token CSS. */
-export type TokenCssSource = { css(): string };
+export type TokenCssSource = { stylesheet(): string };

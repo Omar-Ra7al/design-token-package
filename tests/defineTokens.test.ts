@@ -170,8 +170,8 @@ describe('defineTokens', () => {
     );
   });
 
-  it('theme() is empty unless generateThemeInline is on', () => {
-    expect(sample.theme()).toBe('');
+  it('tailwind() is empty unless generateThemeInline is on', () => {
+    expect(sample.tailwind()).toBe('');
 
     const withTailwind = defineTokens({
       selector: 'class',
@@ -191,13 +191,13 @@ describe('defineTokens', () => {
     });
 
     expect(withTailwind.css()).not.toContain('@theme');
-    expect(withTailwind.theme()).toBe(
+    expect(withTailwind.tailwind()).toBe(
       '@theme inline{--color-background:var(--background);--color-primary:var(--primary);--color-seafoam:var(--seafoam);--radius-md:var(--radius-md);--spacing-md:var(--spacing-md)}',
     );
-    expect(withTailwind.theme()).not.toContain('navHeight');
+    expect(withTailwind.tailwind()).not.toContain('navHeight');
   });
 
-  it('theme() is empty when enabled but only custom tokens exist', () => {
+  it('tailwind() is empty when enabled but only custom tokens exist', () => {
     const customOnly = defineTokens({
       selector: 'class',
       defaultTheme: 'light',
@@ -206,6 +206,22 @@ describe('defineTokens', () => {
       themes: { dark: {} },
     });
 
-    expect(customOnly.theme()).toBe('');
+    expect(customOnly.tailwind()).toBe('');
+  });
+
+  it('stylesheet() is css() plus tailwind()', () => {
+    expect(sample.stylesheet()).toBe(sample.css());
+
+    const withTailwind = defineTokens({
+      selector: 'class',
+      defaultTheme: 'light',
+      tailwind: { generateThemeInline: true },
+      tokens: { color: { primary: '#000' } },
+      themes: { dark: { color: { primary: '#fff' } } },
+    });
+
+    expect(withTailwind.stylesheet()).toBe(`${withTailwind.css()}${withTailwind.tailwind()}`);
+    expect(withTailwind.stylesheet()).toContain(':root{');
+    expect(withTailwind.stylesheet()).toContain('@theme inline{');
   });
 });

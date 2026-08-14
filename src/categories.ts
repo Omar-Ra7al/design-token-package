@@ -9,7 +9,7 @@
  *
  * `color` and `custom` are deliberately unprefixed, which is the convention
  * shadcn/ui popularised: `--primary`, `--background`, `--navHeight`. Colors are
- * remapped into Tailwind via `theme()` (`--color-primary: var(--primary)`);
+ * remapped into Tailwind via `tailwind()` (`--color-primary: var(--primary)`);
  * other categories are registered in place. `custom` has no Tailwind namespace.
  *
  * @see https://tailwindcss.com/docs/theme

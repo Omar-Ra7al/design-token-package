@@ -196,7 +196,7 @@ function printGuide(
   if (mode === 'tokens') {
     const tailwindHint = generateThemeInline
       ? `
-  3. For Tailwind utilities, put tokens.theme() in a CSS file Tailwind compiles
+  3. For Tailwind utilities, put tokens.tailwind() in a CSS file Tailwind compiles
      (after @import "tailwindcss"), or run: npx design-tokens build
 `
       : '';

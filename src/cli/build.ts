@@ -42,7 +42,8 @@ export function buildCssBanner(
 type TokensExport = {
   tokens?: {
     css?: () => string;
-    theme?: () => string;
+    tailwind?: () => string;
+    stylesheet?: () => string;
   };
 };
 
@@ -76,8 +77,11 @@ export async function runBuild(options: BuildOptions): Promise<number> {
     return 1;
   }
 
-  const themeCss = typeof tokens.theme === 'function' ? tokens.theme() : '';
-  const css = `${buildCssBanner(cwd, paths, { hasThemeInline: themeCss.length > 0 })}${tokens.css()}${themeCss}\n`;
+  const sheet =
+    typeof tokens.stylesheet === 'function'
+      ? tokens.stylesheet()
+      : `${tokens.css()}${typeof tokens.tailwind === 'function' ? tokens.tailwind() : ''}`;
+  const css = `${buildCssBanner(cwd, paths, { hasThemeInline: sheet.includes('@theme inline') })}${sheet}\n`;
   mkdirSync(dirname(paths.cssPath), { recursive: true });
   writeFileSync(paths.cssPath, css, 'utf8');
 

@@ -346,7 +346,7 @@ describe('runBuild', () => {
     expect(written).toContain(':root{--primary:red}.dark{--primary:white}');
   });
 
-  it('appends theme() after css() when present', async () => {
+  it('appends tailwind() after css() when present', async () => {
     const root = tempRoot();
     mkdirSync(join(root, 'theme'), { recursive: true });
     const tokensPath = join(root, 'theme', 'tokens.ts');
@@ -358,7 +358,7 @@ describe('runBuild', () => {
   css() {
     return ":root{--primary:red}";
   },
-  theme() {
+  tailwind() {
     return "@theme inline{--color-primary:var(--primary)}";
   },
 };

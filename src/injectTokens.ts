@@ -3,7 +3,7 @@ import type { TokenCssSource } from './types';
 const STYLE_ATTRIBUTE = 'data-design-tokens';
 
 /**
- * Injects the generated token CSS into the document `<head>`.
+ * Injects `tokens.stylesheet()` into the document `<head>`.
  *
  * This function is safe to call in server-side environments.
  * When `document` is unavailable, it does nothing.
@@ -28,7 +28,7 @@ export function injectTokens(tokens: TokenCssSource): () => void {
     document.head.appendChild(style);
   }
 
-  style.textContent = tokens.css();
+  style.textContent = tokens.stylesheet();
 
   return () => {
     style?.remove();
