@@ -14,14 +14,14 @@ const tokens = defineTokens({
 });
 
 afterEach(() => {
-  document.head.querySelectorAll('style[data-design-tokens]').forEach((el) => el.remove());
+  document.head.querySelectorAll('style[data-define-tokens]').forEach((el) => el.remove());
 });
 
 describe('injectTokens', () => {
   it('injects tokens.stylesheet() when tailwind() is empty', () => {
     injectTokens(tokens);
 
-    const style = document.head.querySelector('style[data-design-tokens]');
+    const style = document.head.querySelector('style[data-define-tokens]');
     expect(style?.textContent).toBe(tokens.stylesheet());
     expect(style?.textContent).not.toContain('@theme');
   });
@@ -37,7 +37,7 @@ describe('injectTokens', () => {
 
     injectTokens(withTailwind);
 
-    const style = document.head.querySelector('style[data-design-tokens]');
+    const style = document.head.querySelector('style[data-define-tokens]');
     expect(style?.textContent).toBe(withTailwind.stylesheet());
     expect(style?.textContent).toContain('@theme inline{');
     expect(style?.textContent).toContain('--color-primary:var(--primary)');

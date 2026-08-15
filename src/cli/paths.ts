@@ -55,7 +55,7 @@ export function resolveTokenPaths(cwd: string, args: string[]): TokenPaths {
 
   throw new Error(
     'Expected 0 or 2 path arguments: [tokens.ts] [tokens.css]\n' +
-      '  npx design-tokens build\n' +
-      '  npx design-tokens build ./path/to/tokens.ts ./path/to/tokens.css',
+      '  npx define-tokens build\n' +
+      '  npx define-tokens build ./path/to/tokens.ts ./path/to/tokens.css',
   );
 }

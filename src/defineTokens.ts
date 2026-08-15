@@ -341,7 +341,7 @@ export function defineTokens<
   }
 
   /**
-   * Full stylesheet for injection and `design-tokens build`: `css()`, then
+   * Full stylesheet for injection and `define-tokens build`: `css()`, then
    * `tailwind()` when that bridge is non-empty.
    */
   function stylesheet(): string {

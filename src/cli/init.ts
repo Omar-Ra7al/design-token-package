@@ -197,7 +197,7 @@ function printGuide(
     const tailwindHint = generateThemeInline
       ? `
   3. For Tailwind utilities, put tokens.tailwind() in a CSS file Tailwind compiles
-     (after @import "tailwindcss"), or run: npx design-tokens build
+     (after @import "tailwindcss"), or run: npx define-tokens build
 `
       : '';
 
@@ -223,9 +223,9 @@ Next:
   console.log(`
 Next:
   1. Define your tokens in ${tokensDisplay}
-  2. Run: npx design-tokens build${importHint}
+  2. Run: npx define-tokens build${importHint}
 Custom paths:
-  npx design-tokens build ./path/to/tokens.ts ./path/to/tokens.css
+  npx define-tokens build ./path/to/tokens.ts ./path/to/tokens.css
 `);
 }
 

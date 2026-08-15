@@ -17,8 +17,8 @@
     "esModuleInterop": true,
     "noEmit": true,
     "paths": {
-      "@Omar-Ra7al/design-token-package": ["./src/index.ts"],
-      "@Omar-Ra7al/design-token-package/*": ["./src/*"]
+      "define-tokens": ["./src/index.ts"],
+      "define-tokens/*": ["./src/*"]
     }
   },
   "include": [

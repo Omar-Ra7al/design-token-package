@@ -1,6 +1,6 @@
 import type { TokenCssSource } from './types';
 
-const STYLE_ATTRIBUTE = 'data-design-tokens';
+const STYLE_ATTRIBUTE = 'data-define-tokens';
 
 /**
  * Injects `tokens.stylesheet()` into the document `<head>`.

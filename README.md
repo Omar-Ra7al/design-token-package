@@ -13,7 +13,7 @@ defineTokens({ selector, defaultTheme, tokens, themes, tailwind? })
 ## Install
 
 ```bash
-npm install design-token-package
+npm install define-tokens
 ```
 
 Core needs no React. For `TokenSheet`, install peer deps `react` and `react-dom` (`^18` or `^19`).
@@ -23,8 +23,8 @@ Core needs no React. For `TokenSheet`, install peer deps `react` and `react-dom`
 Scaffold tokens interactively, then generate CSS when needed:
 
 ```bash
-npx design-tokens init
-npx design-tokens build
+npx define-tokens init
+npx define-tokens build
 ```
 
 `init` walks you through steps (no path arguments):
@@ -46,8 +46,8 @@ Defaults:
 `build` still accepts optional paths:
 
 ```bash
-npx design-tokens build
-npx design-tokens build ./src/design-system/theme.ts ./src/design-system/theme.css
+npx define-tokens build
+npx define-tokens build ./src/design-system/theme.ts ./src/design-system/theme.css
 ```
 
 `init` only creates/updates its own files — anything else in the folder is left alone. **Create missing files only** appears when at least one relevant file is still missing.
@@ -60,11 +60,11 @@ After a successful CSS-mode init:
 
 Next:
   1. Define your tokens in src/theme/tokens.ts
-  2. Run: npx design-tokens build
+  2. Run: npx define-tokens build
   3. Import src/theme/tokens.css into your global stylesheet
 
 Custom paths:
-  npx design-tokens build ./path/to/tokens.ts ./path/to/tokens.css
+  npx define-tokens build ./path/to/tokens.ts ./path/to/tokens.css
 ```
 
 After a successful tokens-only init:
@@ -87,8 +87,8 @@ The initial CSS file is a comment stub. Real CSS comes from `build`, which write
 ### Core (any framework)
 
 ```ts
-import { defineTokens } from '@Omar-Ra7al/design-token-package';
-import type { TokensApi, TokenRef } from '@Omar-Ra7al/design-token-package';
+import { defineTokens } from 'define-tokens';
+import type { TokensApi, TokenRef } from 'define-tokens';
 
 export const tokens = defineTokens({
   selector: 'class',
@@ -167,7 +167,7 @@ tokens.tailwind();
 // "@theme inline{--color-primary:var(--primary);--spacing-md:var(--spacing-md)}"
 ```
 
-`css()` never includes `@theme`. `stylesheet()` is `css()` plus `tailwind()` when the flag is on — that is what `TokenSheet`, `injectTokens`, and `npx design-tokens build` emit. The generated file header reminds you to remove any hand-written `@theme inline`. Import the generated file **after** `@import "tailwindcss"` so Tailwind utilities actually pick up the bridge.
+`css()` never includes `@theme`. `stylesheet()` is `css()` plus `tailwind()` when the flag is on — that is what `TokenSheet`, `injectTokens`, and `npx define-tokens build` emit. The generated file header reminds you to remove any hand-written `@theme inline`. Import the generated file **after** `@import "tailwindcss"` so Tailwind utilities actually pick up the bridge.
 
 Two categories can't claim the same variable. `color.primary` alongside `custom.primary` throws at `defineTokens()` rather than letting one silently overwrite the other in the stylesheet.
 
@@ -253,7 +253,7 @@ Tokens introduced by a theme only exist while that theme's selector is active, s
 ### React
 
 ```tsx
-import { TokenSheet } from '@Omar-Ra7al/design-token-package/react';
+import { TokenSheet } from 'define-tokens/react';
 import { tokens } from './tokens';
 
 // In your root layout:
@@ -265,7 +265,7 @@ import { tokens } from './tokens';
 Same component via the Next entry:
 
 ```tsx
-import { TokenSheet } from '@Omar-Ra7al/design-token-package/next';
+import { TokenSheet } from 'define-tokens/next';
 import { tokens } from './tokens';
 
 // app/layout.tsx
@@ -285,7 +285,7 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 
 ## Public API
 
-### Core (`@Omar-Ra7al/design-token-package`)
+### Core (`define-tokens`)
 
 | Export             | Role                                                                                                                                                                                                                                                                 |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -294,13 +294,13 @@ Mount `TokenSheet` early (e.g. in `<head>` or the app root) so CSS variables exi
 | `TOKEN_CATEGORIES` | The allowed categories mapped to their CSS variable prefix                                                                                                                                                                                                           |
 | Types              | `DefineTokensConfig`, `TailwindConfig`, `SelectorStrategy`, `TokenCategory`, `CategoryPrefix`, `TokenGroup`, `TokenSet`, `ThemeOverride`, `ResolvedTheme`, `TokenPath`, `TokenRef`, `ColorCategory`, `ColorTokenPath`, `TokensApi`, `TokenCssSource`, `OpacityScale` |
 
-### React (`@Omar-Ra7al/design-token-package/react`)
+### React (`define-tokens/react`)
 
 | Export       | Role                                        |
 | ------------ | ------------------------------------------- |
 | `TokenSheet` | React component that injects `tokens.stylesheet()` |
 
-### Next.js (`@Omar-Ra7al/design-token-package/next`)
+### Next.js (`define-tokens/next`)
 
 | Export       | Role                                              |
 | ------------ | ------------------------------------------------- |
@@ -351,9 +351,9 @@ Each public entry exposes `types` then `import` in `package.json` `exports`, so 
 
 | Entry                             | Import                       |
 | --------------------------------- | ---------------------------- |
-| Core (any framework / vanilla JS) | `design-token-package`       |
-| React                             | `design-token-package/react` |
-| Next.js                           | `design-token-package/next`  |
+| Core (any framework / vanilla JS) | `define-tokens`       |
+| React                             | `define-tokens/react` |
+| Next.js                           | `define-tokens/next`  |
 
 ## Consuming in CSS / Tailwind
 
@@ -367,7 +367,7 @@ tailwind: {
 
 Then either:
 
-- run `npx design-tokens build` and import the CSS file after `@import "tailwindcss"`, or
+- run `npx define-tokens build` and import the CSS file after `@import "tailwindcss"`, or
 - paste `tokens.tailwind()` into a CSS file Tailwind compiles
 
 ```css
@@ -408,9 +408,3 @@ Published entry points are `.` (core), `./react`, and `./next` — each as ESM `
 | `npm run format` / `format:check`           | Prettier                              |
 | `npm run pack:check`                        | Preview files that would be published |
 | `npm run changeset` / `version` / `release` | Changesets publish flow               |
-
-## Rename this package
-
-```bash
-node scripts/rename.mjs @your-scope/design-tokens "Typed design token toolkit"
-```

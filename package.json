@@ -1,7 +1,7 @@
 {
-  "name": "design-token-package",
+  "name": "define-tokens",
   "version": "0.0.16",
-  "description": "Theme token system package",
+  "description": "Typed TypeScript design tokens compiled to CSS custom properties",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -24,7 +24,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "design-tokens": "./dist/cli/index.js"
+    "define-tokens": "./dist/cli/index.js"
   },
   "files": [
     "dist"

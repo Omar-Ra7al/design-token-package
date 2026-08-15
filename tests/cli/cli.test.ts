@@ -13,7 +13,7 @@ import {
 import { emptyCssStub, tokensScaffold } from '../../src/cli/scaffold';
 
 function tempRoot(): string {
-  return mkdtempSync(join(tmpdir(), 'design-tokens-cli-'));
+  return mkdtempSync(join(tmpdir(), 'define-tokens-cli-'));
 }
 
 afterEach(() => {
@@ -78,13 +78,13 @@ describe('buildConflictOptions', () => {
 
 describe('tokensScaffold', () => {
   it('omits the tailwind block by default', () => {
-    const scaffold = tokensScaffold('design-token-package');
+    const scaffold = tokensScaffold('define-tokens');
     expect(scaffold).not.toContain('generateThemeInline');
     expect(scaffold).not.toContain('tailwind:');
   });
 
   it('includes generateThemeInline when requested', () => {
-    const scaffold = tokensScaffold('design-token-package', {
+    const scaffold = tokensScaffold('define-tokens', {
       generateThemeInline: true,
     });
     expect(scaffold).toContain('tailwind: {');
@@ -100,14 +100,14 @@ describe('runInit', () => {
 
     const code = await runInit({
       cwd: root,
-      packageName: 'design-token-package',
+      packageName: 'define-tokens',
       chooseUsage: async () => 'css',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
     });
 
     expect(code).toBe(0);
-    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(tokensScaffold('design-token-package'));
+    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(tokensScaffold('define-tokens'));
     expect(readFileSync(paths.cssPath, 'utf8')).toBe(emptyCssStub());
   });
 
@@ -118,7 +118,7 @@ describe('runInit', () => {
 
     const code = await runInit({
       cwd: root,
-      packageName: 'design-token-package',
+      packageName: 'define-tokens',
       chooseUsage: async () => 'css',
       chooseTailwind: async () => true,
       choosePathMode: async () => 'defaults',
@@ -126,7 +126,7 @@ describe('runInit', () => {
 
     expect(code).toBe(0);
     expect(readFileSync(paths.tokensPath, 'utf8')).toBe(
-      tokensScaffold('design-token-package', { generateThemeInline: true }),
+      tokensScaffold('define-tokens', { generateThemeInline: true }),
     );
   });
 
@@ -137,14 +137,14 @@ describe('runInit', () => {
 
     const code = await runInit({
       cwd: root,
-      packageName: 'design-token-package',
+      packageName: 'define-tokens',
       chooseUsage: async () => 'tokens',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
     });
 
     expect(code).toBe(0);
-    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(tokensScaffold('design-token-package'));
+    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(tokensScaffold('define-tokens'));
     expect(existsSync(paths.cssPath)).toBe(false);
   });
 
@@ -155,7 +155,7 @@ describe('runInit', () => {
 
     const code = await runInit({
       cwd: root,
-      packageName: 'design-token-package',
+      packageName: 'define-tokens',
       chooseUsage: async () => 'css',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'custom',
@@ -163,7 +163,7 @@ describe('runInit', () => {
     });
 
     expect(code).toBe(0);
-    expect(readFileSync(tokensPath, 'utf8')).toBe(tokensScaffold('design-token-package'));
+    expect(readFileSync(tokensPath, 'utf8')).toBe(tokensScaffold('define-tokens'));
     expect(readFileSync(cssPath, 'utf8')).toBe(emptyCssStub());
   });
 
@@ -174,7 +174,7 @@ describe('runInit', () => {
 
     const code = await runInit({
       cwd: root,
-      packageName: 'design-token-package',
+      packageName: 'define-tokens',
       chooseUsage: async () => 'tokens',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'custom',
@@ -194,7 +194,7 @@ describe('runInit', () => {
 
     await runInit({
       cwd: root,
-      packageName: 'design-token-package',
+      packageName: 'define-tokens',
       chooseUsage: async () => 'tokens',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
@@ -213,7 +213,7 @@ describe('runInit', () => {
 
     await runInit({
       cwd: root,
-      packageName: 'design-token-package',
+      packageName: 'define-tokens',
       chooseUsage: async () => 'css',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
@@ -231,7 +231,7 @@ describe('runInit', () => {
 
     const code = await runInit({
       cwd: root,
-      packageName: 'design-token-package',
+      packageName: 'define-tokens',
       chooseUsage: async () => 'css',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
@@ -256,7 +256,7 @@ describe('runInit', () => {
 
     const code = await runInit({
       cwd: root,
-      packageName: 'design-token-package',
+      packageName: 'define-tokens',
       chooseUsage: async () => 'css',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
@@ -281,7 +281,7 @@ describe('runInit', () => {
 
     const code = await runInit({
       cwd: root,
-      packageName: 'design-token-package',
+      packageName: 'define-tokens',
       chooseUsage: async () => 'css',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
@@ -289,7 +289,7 @@ describe('runInit', () => {
     });
 
     expect(code).toBe(0);
-    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(tokensScaffold('design-token-package'));
+    expect(readFileSync(paths.tokensPath, 'utf8')).toBe(tokensScaffold('define-tokens'));
     expect(readFileSync(paths.cssPath, 'utf8')).toBe(emptyCssStub());
   });
 
@@ -302,7 +302,7 @@ describe('runInit', () => {
 
     const code = await runInit({
       cwd: root,
-      packageName: 'design-token-package',
+      packageName: 'define-tokens',
       chooseUsage: async () => 'css',
       chooseTailwind: async () => false,
       choosePathMode: async () => 'defaults',
@@ -341,8 +341,8 @@ describe('runBuild', () => {
     expect(code).toBe(0);
     const written = readFileSync(cssPath, 'utf8');
     expect(written).toContain('DO NOT EDIT THIS FILE');
-    expect(written).toContain('npx design-tokens build');
-    expect(written).toContain('npx design-tokens build theme/tokens.ts theme/tokens.css');
+    expect(written).toContain('npx define-tokens build');
+    expect(written).toContain('npx define-tokens build theme/tokens.ts theme/tokens.css');
     expect(written).toContain(':root{--primary:red}.dark{--primary:white}');
   });
 

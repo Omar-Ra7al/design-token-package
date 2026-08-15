@@ -18,7 +18,7 @@ function packageJson(): { name: string; version: string } {
 }
 
 const pkg = packageJson();
-const cli = cac('design-tokens');
+const cli = cac('define-tokens');
 
 cli
   .command('init', 'Scaffold tokens via interactive steps')

@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@Omar-Ra7al/design-token-package': resolve(rootDir, 'src'),
+      'define-tokens': resolve(rootDir, 'src'),
       react: resolve(rootDir, 'node_modules/react'),
       'react-dom': resolve(rootDir, 'node_modules/react-dom'),
     },
